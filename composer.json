@@ -1,0 +1,23 @@
+{
+    "name": "moebius/promise",
+    "description": "A promise implementation for PHP.",
+    "type": "library",
+    "require-dev": {
+        "charm/testing": "dev-master"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Moebius\\Promise\\": "src/"
+        },
+        "classmap": ["Promise.php"]
+    },
+    "authors": [
+        {
+            "name": "Frode Børli",
+            "email": "frode@ennerd.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {}
+}
