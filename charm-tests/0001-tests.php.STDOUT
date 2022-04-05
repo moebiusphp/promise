@@ -1,0 +1,16 @@
+Testing resolutions
+Promise result OK: true
+Promise result OK: false
+Promise result OK: null
+
+Testing rejections
+Promise rejection OK: true
+Promise rejection OK: false
+Promise rejection OK: null
+
+Testing chained promises:
+ 1. Resolved with reason "Starting to resolve them"
+ 2. Resolved with reason "First one done."
+ 3. Resolved with reason "Second one done."
+ 4. Final one with reason "Third one done."
+Finally we have this result from a promise returned in the last one: "This came from a returned promise"

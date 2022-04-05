@@ -9,7 +9,6 @@ class Promise {
     const PENDING = 'pending';
     const FULFILLED = 'fulfilled';
     const REJECTED = 'rejected';
-    const CANCELLED = 'cancelled';
 
     /**
      * Cast a Thenable class into a Promise
@@ -111,19 +110,17 @@ class Promise {
     private string $status = self::PENDING;
     private ?array $resolvers = [];
     private ?array $rejectors = [];
-    private $canceller;
     private ?array $childPromises = [];
     private bool $fromThenable = false;
 
-    public function __construct(callable $resolver=null, callable $canceller=null) {
+    public function __construct(callable $resolver=null) {
         if ($resolver !== null) {
             $resolver($this->resolve(...), $this->reject(...));
         }
-        $this->canceller = $canceller;
     }
 
     /**
-     * Return 'pending', 'fulfilled', 'rejected' or 'cancelled'
+     * Return 'pending', 'fulfilled', 'rejected'
      */
     public function status(): string {
         return $this->status;
@@ -150,69 +147,51 @@ class Promise {
     }
 
     public function then(callable $onFulfilled=null, callable $onRejected=null): Promise {
-        if ($this->status === self::PENDING) {
-            if (null !== $onFulfilled) {
-                $this->resolvers[] = $onFulfilled;
-            }
-            if (null !== $onRejected) {
-                $this->rejectors[] = $onRejected;
-            }
-            $resolverIndex = count($this->resolvers);
-            $rejectorIndex = count($this->rejectors);
-            $nextPromise = new static(function(callable $resolver, callable $rejector) use ($resolverIndex, $rejectorIndex) {
-                $this->resolvers[$resolverIndex] = $resolver;
-                $this->rejectors[$rejectorIndex] = $rejector;
-            }, function() use ($resolverIndex, $rejectorIndex) {
-                // if the returned promise is cancelled, we must ensure the resolve or reject function is not invoked
-                unset($this->resolvers[$resolverIndex]);
-                unset($this->rejectors[$rejectorIndex]);
-            });
-            if ($this->canceller) {
-                $this->childPromises[] = $nextPromise;
-            }
-            return $nextPromise;
-        } elseif ($this->status === self::FULFILLED) {
-            if (null !== $onFulfilled) {
-                $onFulfilled($this->result);
+        $nextPromise = new static();
+        if ($onFulfilled !== null && $this->status !== self::REJECTED) {
+            $this->resolvers[] = function($result) use ($onFulfilled, $nextPromise) {
+                try {
+                    $nextResult = $onFulfilled($result);
+                    $nextPromise->resolve($nextResult);
+                } catch (\Throwable $e) {
+                    $nextPromise->reject($e);
+                }
+            };
+        }
+        if ($onRejected !== null && $this->status !== self::FULFILLED) {
+            $this->rejectors[] = function($reason) use ($onRejected, $nextPromise) {
+                try {
+                    $nextRejection = $onRejected($reason);
+                    $nextPromise->reject($nextRejection);
+                } catch (\Throwable $e) {
+                    $nextPromise->reject($e);
+                }
+            };
+        }
+        $this->settle();
+        return $nextPromise;
+    }
+
+    private function settle(): void {
+        if ($this->status === self::FULFILLED) {
+            $resolvers = $this->resolvers;
+            $this->resolvers = [];
+            $this->rejectors = null;
+            foreach ($resolvers as $resolver) {
+                $resolver($this->result);
             }
         } elseif ($this->status === self::REJECTED) {
-            if (null !== $onRejected) {
-                $onRejected($this->result);
+            $rejectors = $this->rejectors;
+            $this->resolvers = null;
+            $this->rejectors = [];
+            foreach ($rejectors as $rejector) {
+                $rejector($this->result);
             }
-        } elseif ($this->status === self::CANCELLED) {
-            // We'll return this same promise just to be API compliant
-            return $this;
         }
-        $nextPromise = new static();
-        $nextPromise->status = $this->status;
-        $nextPromise->result = $this->result;
-        if ($this->canceller) {
-            $this->childPromises[] = $nextPromise;
-        }
-        return $nextPromise;
     }
 
     public function otherwise(callable $onRejected): Promise {
         return $this->then(null, $onRejected);
-    }
-
-    public function cancel(): void {
-        if ($this->status !== self::PENDING) {
-            return;
-        }
-        $canceller = $this->canceller;
-        $this->canceller = null;
-        $this->status = self::CANCELLED;
-        $this->result = null;
-        $this->resolvers = nul;
-        $this->rejectors = null;
-        foreach ($this->childPromises as $childPromise) {
-            $childPromise->cancel();
-        }
-        $this->childPromises = null;
-        if ($canceller) {
-            $canceller();
-        }
     }
 
     /**
@@ -230,19 +209,16 @@ class Promise {
         if ($this->fromThenable) {
             throw new Promise\Exception("Promise was cast from Thenable and can't be externally resolved");
         }
+        if (self::isThenable($result)) {
+            $result->then($this->resolve(...), $this->reject(...));
+            return;
+        }
         if ($this->status !== self::PENDING) {
             return;
         }
         $this->status = self::FULFILLED;
         $this->result = $result;
-        $this->canceller = null;
-
-        foreach ($this->resolvers as $resolver) {
-            $resolver($result);
-        }
-        $this->resolvers = null;
-        $this->rejectors = null;
-        $this->childPromises = null;
+        $this->settle();
     }
 
     /**
@@ -252,19 +228,16 @@ class Promise {
         if ($this->fromThenable) {
             throw new Promise\Exception("Promise was cast from Thenable and can't be externally rejected");
         }
+        if (self::isThenable($reason)) {
+            $reason->then($this->reject(...), $this->reject(...));
+            return;
+        }
         if ($this->status !== self::PENDING) {
             return;
         }
         $this->status = self::REJECTED;
         $this->result = $reason;
-        $this->canceller = null;
-
-        foreach ($this->rejectors as $rejector) {
-            $rejector($reason);
-        }
-        $this->resolvers = null;
-        $this->rejectors = null;
-        $this->childPromises = null;
+        $this->settle();
     }
 
     /**
@@ -274,6 +247,41 @@ class Promise {
         foreach ($promises as $promise) {
             static::assertThenable($promise);
         }
+    }
+
+    private static function isThenable(mixed $thenable): bool {
+        if (!is_object($thenable)) {
+            return false;
+        }
+        if ($thenable instanceof Promise) {
+            return true;
+        }
+        if (!method_exists($thenable, 'then')) {
+            return false;
+        }
+        $rf = new ReflectionFunction($thenable->then(...));
+        if ($rf->getNumberOfParameters() < 2) {
+            return false;
+        }
+        $rp = $rf->getParameters();
+        foreach ([0, 1] as $p) {
+            if (!$rp[$p]->hasType()) {
+                continue;
+            }
+            $rt = $rp[$p]->getType();
+
+            if ($rt instanceof ReflectionNamedType && $rt->getName() === 'callable') {
+                continue;
+            } elseif ($rt instanceof ReflectionUnionType) {
+                foreach ($rt->getTypes() as $rst) {
+                    if ($rt->getName() === 'callable') {
+                        continue 2;
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     private static function assertThenable(object $thenable): void {
