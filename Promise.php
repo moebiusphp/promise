@@ -249,7 +249,14 @@ class Promise {
         }
     }
 
-    private static function isThenable(mixed $thenable): bool {
+    /**
+     * Check if an object is promise-like, or "thenable". This is for compatability
+     * with other promise implementations.
+     *
+     * @param object $thenable The object to check
+     * @return bool Returns true if the object appears to be promise like.
+     */
+    public static function isThenable(mixed $thenable): bool {
         if (!is_object($thenable)) {
             return false;
         }
