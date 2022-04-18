@@ -20,7 +20,7 @@ class Promise {
 
         static::assertThenable($thenable);
 
-        $promise = new static(function($resolve, $reject) use ($thenable) {
+        $promise = new self(function($resolve, $reject) use ($thenable) {
             $thenable->then($resolve, $reject);
         });
         $promise->fromThenable = true;
@@ -32,7 +32,7 @@ class Promise {
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
      */
     public static function all(iterable $promises): Promise {
-        $promise = new static();
+        $promise = new self();
         $results = [];
         $offset = 0;
         $counter = count($promises);
@@ -57,7 +57,7 @@ class Promise {
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
      */
     public static function allSettled(iterable $promises): Promise {
-        $promise = new static();
+        $promise = new self();
         $results = [];
         $counter = count($promises);
         foreach ($promises as $theirPromise) {
@@ -75,7 +75,7 @@ class Promise {
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
      */
     public static function any(iterable $promises): Promise {
-        $promise = new static();
+        $promise = new self();
         $errors = [];
         $counter = count($promises);
         foreach ($promises as $offset => $theirPromise) {
@@ -95,7 +95,7 @@ class Promise {
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
      */
     public static function race(iterable $promises): Promise {
-        $promise = new static();
+        $promise = new self();
         foreach ($promises as $theirPromise) {
             static::cast($theirPromise)->then(function($result) use ($promise) {
                 $promise->resolve($result);
@@ -147,7 +147,7 @@ class Promise {
     }
 
     public function then(callable $onFulfilled=null, callable $onRejected=null): Promise {
-        $nextPromise = new static();
+        $nextPromise = new self();
         if ($onFulfilled !== null && $this->status !== self::REJECTED) {
             $this->resolvers[] = function($result) use ($onFulfilled, $nextPromise) {
                 try {
