@@ -4,21 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "04dbfc309c055d731db803d60fb4209d",
+    "content-hash": "72deb50d675820dc776a38b6ec286aca",
     "packages": [],
     "packages-dev": [
         {
             "name": "charm/options",
-            "version": "1.0.5",
+            "version": "1.0.8",
             "source": {
                 "type": "git",
                 "url": "https://bitbucket.org/ennerd/charm-options.git",
-                "reference": "7e67cea54370b22b015556f1b31b65b62ce92e89"
+                "reference": "a11bdda40fca0d8f6c711d8eb2d5eb8a42e91f3d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://bitbucket.org/ennerd/charm-options/get/7e67cea54370b22b015556f1b31b65b62ce92e89.zip",
-                "reference": "7e67cea54370b22b015556f1b31b65b62ce92e89",
+                "url": "https://bitbucket.org/ennerd/charm-options/get/a11bdda40fca0d8f6c711d8eb2d5eb8a42e91f3d.zip",
+                "reference": "a11bdda40fca0d8f6c711d8eb2d5eb8a42e91f3d",
                 "shasum": ""
             },
             "type": "library",
@@ -43,27 +43,27 @@
             "description": "A generic class for storing options while enforcing option types.",
             "homepage": "https://bitbucket.org/ennerd/charm-options",
             "support": {
-                "source": "https://bitbucket.org/ennerd/charm-options/src/7e67cea54370b22b015556f1b31b65b62ce92e89/?at=1.0.5"
+                "source": "https://bitbucket.org/ennerd/charm-options/src/a11bdda40fca0d8f6c711d8eb2d5eb8a42e91f3d/?at=1.0.8"
             },
-            "time": "2022-01-08T17:17:09+00:00"
+            "time": "2022-04-18T21:01:37+00:00"
         },
         {
             "name": "charm/terminal",
-            "version": "1.0.6",
+            "version": "1.0.7",
             "source": {
                 "type": "git",
                 "url": "https://bitbucket.org/ennerd/terminal.git",
-                "reference": "c150ac68b012e5b9e3f05379be3cce2b04f9c9c9"
+                "reference": "5441b2d5a537570acd264a18c31a47ef50e94418"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://bitbucket.org/ennerd/terminal/get/c150ac68b012e5b9e3f05379be3cce2b04f9c9c9.zip",
-                "reference": "c150ac68b012e5b9e3f05379be3cce2b04f9c9c9",
+                "url": "https://bitbucket.org/ennerd/terminal/get/5441b2d5a537570acd264a18c31a47ef50e94418.zip",
+                "reference": "5441b2d5a537570acd264a18c31a47ef50e94418",
                 "shasum": ""
             },
             "require": {
-                "charm/options": "^1.0",
-                "charm/util-phpencode": "^1.0"
+                "charm/options": ">=1.0.6",
+                "charm/util-phpencode": ">=1.0.2"
             },
             "type": "library",
             "autoload": {
@@ -90,29 +90,28 @@
             "description": "Organized and colorful command line output through a simple markup language.",
             "homepage": "https://bitbucket.org/ennerd/terminal",
             "support": {
-                "source": "https://bitbucket.org/ennerd/terminal/src/c150ac68b012e5b9e3f05379be3cce2b04f9c9c9/?at=1.0.6"
+                "source": "https://bitbucket.org/ennerd/terminal/src/5441b2d5a537570acd264a18c31a47ef50e94418/?at=1.0.7"
             },
-            "time": "2022-04-01T11:14:40+00:00"
+            "time": "2022-04-08T20:40:08+00:00"
         },
         {
             "name": "charm/testing",
-            "version": "dev-master",
+            "version": "0.0.9",
             "source": {
                 "type": "git",
                 "url": "https://bitbucket.org/ennerd/charm-testing.git",
-                "reference": "f434b69218f2a9d5d528abac93021cfe3f92882f"
+                "reference": "389cdbb3a0a997459605a24204a59423b5f006ee"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://bitbucket.org/ennerd/charm-testing/get/f434b69218f2a9d5d528abac93021cfe3f92882f.zip",
-                "reference": "f434b69218f2a9d5d528abac93021cfe3f92882f",
+                "url": "https://bitbucket.org/ennerd/charm-testing/get/389cdbb3a0a997459605a24204a59423b5f006ee.zip",
+                "reference": "389cdbb3a0a997459605a24204a59423b5f006ee",
                 "shasum": ""
             },
             "require": {
-                "charm/terminal": "^1.0",
+                "charm/terminal": ">=1.0.6",
                 "charm/util-phpencode": "^1.0"
             },
-            "default-branch": true,
             "bin": [
                 "bin/charm-testing"
             ],
@@ -135,9 +134,9 @@
             "description": "A tool for running regression and unit testing with very little scaffolding.",
             "homepage": "https://bitbucket.org/ennerd/charm-testing",
             "support": {
-                "source": "https://bitbucket.org/ennerd/charm-testing/src/f434b69218f2a9d5d528abac93021cfe3f92882f/?at=0.0.7"
+                "source": "https://bitbucket.org/ennerd/charm-testing/src/389cdbb3a0a997459605a24204a59423b5f006ee/?at=0.0.9"
             },
-            "time": "2022-04-04T21:36:27+00:00"
+            "time": "2022-04-08T20:41:52+00:00"
         },
         {
             "name": "charm/util-phpencode",
@@ -178,11 +177,9 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "dev",
-    "stability-flags": {
-        "charm/testing": 20
-    },
-    "prefer-stable": false,
+    "minimum-stability": "RC",
+    "stability-flags": [],
+    "prefer-stable": true,
     "prefer-lowest": false,
     "platform": [],
     "platform-dev": [],
