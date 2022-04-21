@@ -49,7 +49,7 @@ trait PromiseTrait {
     }
 
     public function then(callable $onFulfilled=null, callable $onRejected=null): PromiseInterface {
-        $nextPromise = new self();
+        $nextPromise = new Promise();
         if ($onFulfilled !== null && $this->status !== Promise::REJECTED) {
             $this->resolvers[] = function($result) use ($onFulfilled, $nextPromise) {
                 try {
