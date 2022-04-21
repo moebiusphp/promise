@@ -2,9 +2,15 @@
 namespace Moebius;
 
 use function method_exists;
-use ReflectionFunction, ReflectionNamedType, ReflectionUnionType;
 
-class Promise {
+use ReflectionFunction, ReflectionNamedType, ReflectionUnionType;
+use Moebius\Promise\{
+    PromiseInterface,
+    PromiseTrait
+};
+
+class Promise implements PromiseInterface {
+    use PromiseTrait;
 
     const PENDING = 'pending';
     const FULFILLED = 'fulfilled';
@@ -14,7 +20,7 @@ class Promise {
      * Cast a Thenable class into a Promise
      */
     public static function cast(object $thenable): self {
-        if ($thenable instanceof Promise) {
+        if ($thenable instanceof PromiseInterface) {
             return $thenable;
         }
 
@@ -106,149 +112,6 @@ class Promise {
         return $promise;
     }
 
-    private mixed $result = null;
-    private string $status = self::PENDING;
-    private ?array $resolvers = [];
-    private ?array $rejectors = [];
-    private ?array $childPromises = [];
-    private bool $fromThenable = false;
-
-    public function __construct(callable $resolver=null) {
-        if ($resolver !== null) {
-            $resolver($this->resolve(...), $this->reject(...));
-        }
-    }
-
-    /**
-     * Return 'pending', 'fulfilled', 'rejected'
-     */
-    public function status(): string {
-        return $this->status;
-    }
-
-    /**
-     * Return value if promise is fulfilled
-     */
-    public function value(): mixed {
-        if ($this->status !== self::FULFILLED) {
-            throw new Promise\Exception("Promise is in the '".$this->status."' state");
-        }
-        return $this->result;
-    }
-
-    /**
-     * Return reason if promise is rejected
-     */
-    public function reason(): mixed {
-        if ($this->status !== self::REJECTED) {
-            throw new Promise\Exception("Promise is in the '".$this->status."' state");
-        }
-        return $this->result;
-    }
-
-    public function then(callable $onFulfilled=null, callable $onRejected=null): Promise {
-        $nextPromise = new self();
-        if ($onFulfilled !== null && $this->status !== self::REJECTED) {
-            $this->resolvers[] = function($result) use ($onFulfilled, $nextPromise) {
-                try {
-                    $nextResult = $onFulfilled($result);
-                    $nextPromise->resolve($nextResult);
-                } catch (\Throwable $e) {
-                    $nextPromise->reject($e);
-                }
-            };
-        }
-        if ($onRejected !== null && $this->status !== self::FULFILLED) {
-            $this->rejectors[] = function($reason) use ($onRejected, $nextPromise) {
-                try {
-                    $nextRejection = $onRejected($reason);
-                    $nextPromise->reject($nextRejection);
-                } catch (\Throwable $e) {
-                    $nextPromise->reject($e);
-                }
-            };
-        }
-        $this->settle();
-        return $nextPromise;
-    }
-
-    private function settle(): void {
-        if ($this->status === self::FULFILLED) {
-            $resolvers = $this->resolvers;
-            $this->resolvers = [];
-            $this->rejectors = null;
-            foreach ($resolvers as $resolver) {
-                $resolver($this->result);
-            }
-        } elseif ($this->status === self::REJECTED) {
-            $rejectors = $this->rejectors;
-            $this->resolvers = null;
-            $this->rejectors = [];
-            foreach ($rejectors as $rejector) {
-                $rejector($this->result);
-            }
-        }
-    }
-
-    public function otherwise(callable $onRejected): Promise {
-        return $this->then(null, $onRejected);
-    }
-
-    /**
-     * Get the current status of the promise (for compatability with other
-     * promise implementations).
-     */
-    public function getState(): string {
-        return $this->status;
-    }
-
-    /**
-     * Resolve the promise with a value
-     */
-    public function resolve(mixed $result=null): void {
-        if ($this->fromThenable) {
-            throw new Promise\Exception("Promise was cast from Thenable and can't be externally resolved");
-        }
-        if (self::isThenable($result)) {
-            $result->then($this->resolve(...), $this->reject(...));
-            return;
-        }
-        if ($this->status !== self::PENDING) {
-            return;
-        }
-        $this->status = self::FULFILLED;
-        $this->result = $result;
-        $this->settle();
-    }
-
-    /**
-     * Reject the promise with a reason
-     */
-    public function reject(mixed $reason=null): void {
-        if ($this->fromThenable) {
-            throw new Promise\Exception("Promise was cast from Thenable and can't be externally rejected");
-        }
-        if (self::isThenable($reason)) {
-            $reason->then($this->reject(...), $this->reject(...));
-            return;
-        }
-        if ($this->status !== self::PENDING) {
-            return;
-        }
-        $this->status = self::REJECTED;
-        $this->result = $reason;
-        $this->settle();
-    }
-
-    /**
-     * Check that the entire array contains only objects with a then-method
-     */
-    private static function assertOnlyPromises(iterable $promises): void {
-        foreach ($promises as $promise) {
-            static::assertThenable($promise);
-        }
-    }
-
     /**
      * Check if an object is promise-like, or "thenable". This is for compatability
      * with other promise implementations.
@@ -260,7 +123,7 @@ class Promise {
         if (!is_object($thenable)) {
             return false;
         }
-        if ($thenable instanceof Promise) {
+        if ($thenable instanceof PromiseInterface) {
             return true;
         }
         if (!method_exists($thenable, 'then')) {
@@ -292,7 +155,7 @@ class Promise {
     }
 
     private static function assertThenable(object $thenable): void {
-        if ($thenable instanceof Promise) {
+        if ($thenable instanceof PromiseInterface) {
             return;
         }
         if (!method_exists($thenable, 'then')) {
