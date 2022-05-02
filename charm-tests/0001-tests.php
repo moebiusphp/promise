@@ -65,4 +65,4 @@ $p->then(function($reason) {
 });
 
 
-$p->resolve("Starting to resolve them");
+$p->fulfill("Starting to resolve them");

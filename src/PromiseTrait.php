@@ -6,7 +6,7 @@ use Moebius\Promise;
 trait PromiseTrait {
     private mixed $result = null;
     private string $status = Promise::PENDING;
-    private ?array $resolvers = [];
+    private ?array $fulfillers = [];
     private ?array $rejectors = [];
     private ?array $childPromises = [];
     private bool $fromThenable = false;
@@ -17,7 +17,7 @@ trait PromiseTrait {
 
     protected function Promise(callable $resolver=null) {
         if ($resolver !== null) {
-            $resolver($this->resolve(...), $this->reject(...));
+            $resolver($this->fulfill(...), $this->reject(...));
         }
     }
 
@@ -48,13 +48,13 @@ trait PromiseTrait {
         return $this->result;
     }
 
-    public function then(callable $onFulfilled=null, callable $onRejected=null): PromiseInterface {
+    public function then(callable $onFulfilled=null, callable $onRejected=null, callable $_onProgress=null): PromiseInterface {
         $nextPromise = new Promise();
         if ($onFulfilled !== null && $this->status !== Promise::REJECTED) {
-            $this->resolvers[] = function($result) use ($onFulfilled, $nextPromise) {
+            $this->fulfillers[] = function($result) use ($onFulfilled, $nextPromise) {
                 try {
                     $nextResult = $onFulfilled($result);
-                    $nextPromise->resolve($nextResult);
+                    $nextPromise->fulfill($nextResult);
                 } catch (\Throwable $e) {
                     $nextPromise->reject($e);
                 }
@@ -74,6 +74,40 @@ trait PromiseTrait {
         return $nextPromise;
     }
 
+    /**
+     * From Amp\Promise
+     * ----------------
+     *
+     * Registers a callback to be invoked when the promise is resolved.
+     *
+     * If this method is called multiple times, additional handlers will be registered instead of replacing any already
+     * existing handlers.
+     *
+     * If the promise is already resolved, the callback MUST be executed immediately.
+     *
+     * Exceptions MUST NOT be thrown from this method. Any exceptions thrown from invoked callbacks MUST be
+     * forwarded to the event-loop error handler.
+     *
+     * Note: You shouldn't implement this interface yourself. Instead, provide a method that returns a promise for the
+     * operation you're implementing. Objects other than pure placeholders implementing it are a very bad idea.
+     *
+     * @param callable $onResolved The first argument shall be `null` on success, while the second shall be `null` on
+     *     failure.
+     *
+     * @psalm-param callable(\Throwable|null, mixed): (Promise|\React\Promise\PromiseInterface|\Generator<mixed,
+     *     Promise|\React\Promise\PromiseInterface|array<array-key, Promise|\React\Promise\PromiseInterface>, mixed,
+     *     mixed>|null) | callable(\Throwable|null, mixed): void $onResolved
+     *
+     * @return void
+     */
+    public function onResolve(callable $handler) {
+        $this->then(function($value) use ($handler) {
+            $handler(null, $value);
+        }, function($value) use ($handler) {
+            $handler($value, null);
+        });
+    }
+
     public function otherwise(callable $onRejected): PromiseInterface {
         return $this->then(null, $onRejected);
     }
@@ -87,14 +121,14 @@ trait PromiseTrait {
     }
 
     /**
-     * Resolve the promise with a value
+     * Fulfill the promise with a value
      */
-    public function resolve(mixed $result=null): void {
+    public function fulfill(mixed $result=null): void {
         if ($this->fromThenable) {
-            throw new Promise\Exception("Promise was cast from Thenable and can't be externally resolved");
+            throw new Promise\Exception("Promise was cast from Thenable and can't be externally fulfilled");
         }
         if (Promise::isThenable($result)) {
-            $result->then($this->resolve(...), $this->reject(...));
+            $result->then($this->fulfill(...), $this->reject(...));
             return;
         }
         if ($this->status !== Promise::PENDING) {
@@ -126,15 +160,15 @@ trait PromiseTrait {
 
     private function settle(): void {
         if ($this->status === Promise::FULFILLED) {
-            $resolvers = $this->resolvers;
-            $this->resolvers = [];
+            $fulfillers = $this->fulfillers;
+            $this->fulfillers = [];
             $this->rejectors = null;
-            foreach ($resolvers as $resolver) {
-                $resolver($this->result);
+            foreach ($fulfillers as $fulfiller) {
+                $fulfiller($this->result);
             }
         } elseif ($this->status === Promise::REJECTED) {
             $rejectors = $this->rejectors;
-            $this->resolvers = null;
+            $this->fulfillers = null;
             $this->rejectors = [];
             foreach ($rejectors as $rejector) {
                 $rejector($this->result);

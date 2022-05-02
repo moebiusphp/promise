@@ -10,7 +10,8 @@
         "psr-4": {
             "Moebius\\Promise\\": "src/"
         },
-        "classmap": ["Promise.php"]
+        "classmap": ["Promise.php"],
+        "files": ["bootstrap.php"]
     },
     "authors": [
         {
@@ -20,5 +21,7 @@
     ],
     "minimum-stability": "RC",
     "prefer-stable": true,
-    "require": {}
+    "require": {
+        "react/promise": "^2.9"
+    }
 }

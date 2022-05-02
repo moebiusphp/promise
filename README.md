@@ -4,6 +4,9 @@ moebius/promise
 A simple and flexible Promise implementation modelled after Promises/A+ in
 JavaScript.
 
+Compatbile with both React and Amp.
+
+
 Basic usage
 -----------
 
