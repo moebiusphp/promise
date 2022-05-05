@@ -1,5 +1,5 @@
 <?php
-namespace Moebius;
+namespace Moebius\Promise;
 
-class PromiseException extends \Exception {
+class Exception extends \Exception {
 }

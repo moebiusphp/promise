@@ -3,8 +3,10 @@ namespace Moebius\Promise;
 
 use React\Promise\PromiseInterface as ReactPromiseInterface;
 use Amp\Promise as AmpPromiseInterface;
+use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
+use Http\Promise\Promise as PhpHttpPromiseInterface;
 
-interface PromiseInterface extends ReactPromiseInterface, AmpPromiseInterface {
+interface PromiseInterface extends ReactPromiseInterface, AmpPromiseInterface, GuzzlePromiseInterface, PhpHttpPromiseInterface {
 
     public function status(): string;
     public function value(): mixed;

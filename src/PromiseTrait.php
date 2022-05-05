@@ -1,7 +1,7 @@
 <?php
 namespace Moebius\Promise;
 
-use Throwable;
+use Throwable, Closure;
 use Moebius\Promise;
 
 trait PromiseTrait {
@@ -11,12 +11,35 @@ trait PromiseTrait {
     private ?array $rejectors = [];
     private ?array $childPromises = [];
     private bool $fromThenable = false;
+//    private ?array $creator = null;
+    private bool $isErrorOwner = true;
+    private Throwable $created;
+    private ?Closure $cancelFunction;
 
-    public function __construct(callable $resolver=null) {
-        $this->Promise($resolver);
+    /**
+     * @param callable $resolver    Function that when invoked resolves the promise.
+     * @param callable $cancel      Function that will be invoked when a promise is cancelled via `Promise::cancel()`.
+     */
+    public function __construct(callable $resolver=null, callable $cancel=null) {
+        $this->Promise($resolver, $cancel);
     }
 
-    protected function Promise(callable $resolver=null) {
+    public function __destruct() {
+        if ($this->status === Promise::REJECTED && $this->isErrorOwner) {
+            if ($this->result instanceof \Throwable) {
+                throw $this->result;
+            } else {
+                throw new ErrorException("Unhandled promise rejection", $this->result, $this->created);
+            }
+        }
+    }
+
+    protected function Promise(callable $resolver=null, callable $cancel=null) {
+        // the generator stores the backtrace
+        $this->created = new ExceptionConstructor($resolver);
+
+        $this->cancelFunction = $cancel;
+
         if ($resolver !== null) {
             $resolver($this->fulfill(...), $this->reject(...));
         }
@@ -34,7 +57,7 @@ trait PromiseTrait {
      */
     public function value(): mixed {
         if ($this->status !== Promise::FULFILLED) {
-            throw new Promise\Exception("Promise is in the '".$this->status."' state");
+            throw new PromiseException("Promise is not fulfilled", 0, $this->created);
         }
         return $this->result;
     }
@@ -44,13 +67,15 @@ trait PromiseTrait {
      */
     public function reason(): mixed {
         if ($this->status !== Promise::REJECTED) {
-            throw new Promise\Exception("Promise is in the '".$this->status."' state");
+            throw new PromiseException("Promise is not rejected", 0, $this->created);
         }
         return $this->result;
     }
 
     public function then(callable $onFulfilled=null, callable $onRejected=null, callable $_onProgress=null): PromiseInterface {
         $nextPromise = new Promise();
+        $nextPromise->created = $this->created;
+        $nextPromise->isErrorOwner = &$this->isErrorOwner;
         if ($onFulfilled !== null && $this->status !== Promise::REJECTED) {
             $this->fulfillers[] = function($result) use ($onFulfilled, $nextPromise) {
                 try {
@@ -126,7 +151,7 @@ trait PromiseTrait {
      */
     public function fulfill(mixed $result=null): void {
         if ($this->fromThenable) {
-            throw new Promise\Exception("Promise was cast from Thenable and can't be externally fulfilled");
+            throw new PromiseException("Promise was cast from Thenable and can't be externally fulfilled", 0, $this->created);
         }
         if (Promise::isThenable($result)) {
             $result->then($this->fulfill(...), $this->reject(...));
@@ -141,11 +166,52 @@ trait PromiseTrait {
     }
 
     /**
+     * Alias of {@see self::fulfill} implemented for compatability with
+     * `GuzzleHttp\Promise\PromiseInterface`.
+     */
+    public function resolve($value) {
+        $this->fulfill($value);
+    }
+
+    /**
+     * Implemented for compatability with `GuzzleHttp\Promise\PromiseInterface`.
+     */
+    public function cancel() {
+        if ($this->state === Promise::PENDING && is_callable($this->cancelFunction)) {
+            try {
+                ($this->cancelFunction)();
+            } catch (\Throwable $e) {
+                if ($this->state === Promise::PENDING) {
+                    $this->reject($e);
+                } else {
+                    throw $e;
+                }
+            }
+            $this->cancelFunction = null;
+        }
+        if ($this->state === Promise::PENDING) {
+            // if the state is still pending we must ensure it is cancelled
+            $this->reject(new CancelledException());
+        }
+    }
+
+    public function wait($unwrap = true) {
+        if ($unwrap) {
+            if (class_exists(\Moebius\Coroutine::class)) {
+                return \Moebius\Coroutine::await($unwrap);
+            }
+            throw new \Exception("Can't unwrap a promise without an event loop currently. Not implemented. You can try to install moebius/coroutine to solve this.");
+        } else {
+            return $this->then(null, null);
+        }
+    }
+
+    /**
      * Reject the promise with a reason
      */
     public function reject(mixed $reason=null): void {
         if ($this->fromThenable) {
-            throw new Promise\Exception("Promise was cast from Thenable and can't be externally rejected");
+            throw new PromiseException("Promise was cast from Thenable and can't be externally rejected", 0, $this->created);
         }
         if (Promise::isThenable($reason)) {
             $reason->then($this->reject(...), $this->reject(...));
@@ -177,17 +243,12 @@ trait PromiseTrait {
             $this->fulfillers = null;
             $this->rejectors = [];
 
-            if (empty($rejectors)) {
-                // This error will be hidden, so throw it or raise error
-                if ($this->result instanceof Throwable) {
-                    throw $this->result;
-                } else {
-                    trigger_error((string) $this->result);
-                }
-            } else {
-                foreach ($rejectors as $rejector) {
-                    $rejector($this->result);
-                }
+            if (!empty($rejectors)) {
+                // We don't need to show this error anymore
+                $this->isErrorOwner = false;
+            }
+            foreach ($rejectors as $rejector) {
+                $rejector($this->result);
             }
         }
     }

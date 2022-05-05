@@ -11,7 +11,7 @@
             "Moebius\\Promise\\": "src/"
         },
         "classmap": ["Promise.php"],
-        "files": ["bootstrap.php"]
+        "files": ["bootstrap.php", "lib/HttpPromiseInterface.php"]
     },
     "authors": [
         {
@@ -22,6 +22,7 @@
     "minimum-stability": "RC",
     "prefer-stable": true,
     "require": {
-        "react/promise": "^2.9"
+        "react/promise": "^2.9",
+        "php-http/promise": "^1.1"
     }
 }

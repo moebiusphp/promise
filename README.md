@@ -1,10 +1,47 @@
 moebius/promise
 ===============
 
-A simple and flexible Promise implementation modelled after Promises/A+ in
-JavaScript.
+A promise implementation which is widely compatible:
 
-Compatbile with both React and Amp.
+ * `guzzlehttp/promises` by implementing `GuzzleHttp\Promise\PromiseInterface`
+ * `react/promise` by implementing `React\Promise\PromiseInterface`
+ * 'php-http/promise' by implementing `Http\Promise\Promise`
+ * `amphp/amp` by implementing `Amp\Promise`
+
+Modelled after Promises/A+ in JavaScript.
+
+Implementation details
+----------------------
+
+In order to maintain compatability with Guzzle and PhpHttp promises, we
+had to fork their libraries. They share constant names which are incompatible.
+
+This means that we are doing something "bad" by an interface from another
+library. These interfaces have been unmodified for two years so we believe
+it is worth it - to achieve compatability/interoperability.
+
+These constants now live in the `Moebius\Promise\SuperPromiseInterface` class,
+so that they are available in both child classes while not being ambiguous
+according to PHP.
+
+Promise resolution
+------------------
+
+Guzzle is quite particular when it comes to promise resolution, in that it
+will defer running the resolve function until you actually request the
+value. This is not ideal for an event loop implementation - because, for
+example if your task takes 1 second to run - you would want to start running
+that task as soon as possible. This is not noticeable when only using it
+with Guzzle, but when combined with other async tasks it becomes annoying.
+
+We don't expect this to be a problem.
+
+Promise::wait()
+----------------
+
+Guzzle and PhpHttp implements a `wait()` function, which is intended to
+start running the asynchronous jobs - almost like using the promise tree
+as an event-loop. 
 
 
 Basic usage
