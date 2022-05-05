@@ -1,6 +1,7 @@
 <?php
 namespace Moebius\Promise;
 
+use Throwable;
 use Moebius\Promise;
 
 trait PromiseTrait {
@@ -55,7 +56,7 @@ trait PromiseTrait {
                 try {
                     $nextResult = $onFulfilled($result);
                     $nextPromise->fulfill($nextResult);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $nextPromise->reject($e);
                 }
             };
@@ -65,7 +66,7 @@ trait PromiseTrait {
                 try {
                     $nextRejection = $onRejected($reason);
                     $nextPromise->reject($nextRejection);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $nextPromise->reject($e);
                 }
             };
@@ -94,9 +95,9 @@ trait PromiseTrait {
      * @param callable $onResolved The first argument shall be `null` on success, while the second shall be `null` on
      *     failure.
      *
-     * @psalm-param callable(\Throwable|null, mixed): (Promise|\React\Promise\PromiseInterface|\Generator<mixed,
+     * @psalm-param callable(Throwable|null, mixed): (Promise|\React\Promise\PromiseInterface|\Generator<mixed,
      *     Promise|\React\Promise\PromiseInterface|array<array-key, Promise|\React\Promise\PromiseInterface>, mixed,
-     *     mixed>|null) | callable(\Throwable|null, mixed): void $onResolved
+     *     mixed>|null) | callable(Throwable|null, mixed): void $onResolved
      *
      * @return void
      */
@@ -161,17 +162,32 @@ trait PromiseTrait {
     private function settle(): void {
         if ($this->status === Promise::FULFILLED) {
             $fulfillers = $this->fulfillers;
+
+            // avoid possible memory leaks:
             $this->fulfillers = [];
             $this->rejectors = null;
+
             foreach ($fulfillers as $fulfiller) {
                 $fulfiller($this->result);
             }
         } elseif ($this->status === Promise::REJECTED) {
             $rejectors = $this->rejectors;
+
+            // avoid possible memory leaks:
             $this->fulfillers = null;
             $this->rejectors = [];
-            foreach ($rejectors as $rejector) {
-                $rejector($this->result);
+
+            if (empty($rejectors)) {
+                // This error will be hidden, so throw it or raise error
+                if ($this->result instanceof Throwable) {
+                    throw $this->result;
+                } else {
+                    trigger_error((string) $this->result);
+                }
+            } else {
+                foreach ($rejectors as $rejector) {
+                    $rejector($this->result);
+                }
             }
         }
     }
