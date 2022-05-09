@@ -17,6 +17,9 @@ trait PromiseTrait {
     private ?Closure $cancelFunction;
 
     /**
+     * When implementing this trait, if your class has a costructor you must call `$this->Promise()`
+     * yourself.
+     *
      * @param callable $resolver    Function that when invoked resolves the promise.
      * @param callable $cancel      Function that will be invoked when a promise is cancelled via `Promise::cancel()`.
      */
@@ -34,6 +37,9 @@ trait PromiseTrait {
         }
     }
 
+    /**
+     * Constructor in the trait
+     */
     protected function Promise(callable $resolver=null, callable $cancel=null) {
         // the generator stores the backtrace
         $this->created = new ExceptionConstructor($resolver);
@@ -41,7 +47,11 @@ trait PromiseTrait {
         $this->cancelFunction = $cancel;
 
         if ($resolver !== null) {
-            $resolver($this->fulfill(...), $this->reject(...));
+            try {
+                $resolver($this->fulfill(...), $this->reject(...));
+            } catch (\Throwable $e) {
+                $this->reject($e);
+            }
         }
     }
 

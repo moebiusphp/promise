@@ -3,7 +3,7 @@ namespace Moebius;
 
 use function method_exists;
 
-use ReflectionFunction, ReflectionNamedType, ReflectionUnionType;
+use ReflectionMethod, ReflectionNamedType, ReflectionUnionType;
 use Moebius\Promise\{
     PromiseInterface,
     PromiseTrait
@@ -30,6 +30,8 @@ class Promise implements PromiseInterface {
             $thenable->then($resolve, $reject);
         });
         $promise->fromThenable = true;
+
+        return $promise;
     }
 
     /**
@@ -129,7 +131,7 @@ class Promise implements PromiseInterface {
         if (!method_exists($thenable, 'then')) {
             return false;
         }
-        $rf = new ReflectionFunction($thenable->then(...));
+        $rf = new ReflectionMethod($thenable, 'then');
         if ($rf->getNumberOfParameters() < 2) {
             return false;
         }
@@ -159,11 +161,14 @@ class Promise implements PromiseInterface {
             return;
         }
         if (!method_exists($thenable, 'then')) {
-            throw new Promise\Exception("Class '".get_class($thenable)."' is not 'Thenable' class.");
+            throw new Promise\InvalidArgumentException("Object of class '".get_class($thenable)."' is not a valid promise. 'then'-method is missing");
         }
-        $rf = new ReflectionFunction($thenable->then(...));
+        $rf = new ReflectionMethod($thenable, 'then');
+        if ($rf->isStatic()) {
+            throw new Promise\InvalidArgumentException("Object of class '".get_class($thenable)."' is not a valid promise. 'then'-method is static");
+        }
         if ($rf->getNumberOfParameters() < 2) {
-            throw new Promise\Exception("Class '".get_class($thenable)."' is not 'Thenable' class.");
+            throw new Promise\InvalidArgumentException("Object of class '".get_class($thenable)."' is not a valid promise. 'then'-method does not accept two arguments");
         }
         $rp = $rf->getParameters();
         foreach ([0, 1] as $p) {

@@ -6,7 +6,7 @@ use Amp\Promise as AmpPromiseInterface;
 use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
 use Http\Promise\Promise as PhpHttpPromiseInterface;
 
-interface PromiseInterface extends ReactPromiseInterface, AmpPromiseInterface, GuzzlePromiseInterface, PhpHttpPromiseInterface {
+interface PromiseInterface extends ReactPromiseInterface, AmpPromiseInterface, GuzzlePromiseInterface {
 
     public function status(): string;
     public function value(): mixed;

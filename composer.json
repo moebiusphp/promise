@@ -5,13 +5,16 @@
     "require-dev": {
         "charm/testing": ">=0"
     },
+    "suggest": {
+        "moebius/coroutine": "Enable awaiting promises within an event loop"
+    },
     "license": "MIT",
     "autoload": {
         "psr-4": {
             "Moebius\\Promise\\": "src/"
         },
         "classmap": ["Promise.php"],
-        "files": ["bootstrap.php", "lib/HttpPromiseInterface.php"]
+        "files": ["bootstrap.php"]
     },
     "authors": [
         {
@@ -21,8 +24,7 @@
     ],
     "minimum-stability": "RC",
     "prefer-stable": true,
-    "require": {
-        "react/promise": "^2.9",
-        "php-http/promise": "^1.1"
+    "scripts": {
+        "test": "vendor/bin/charm-testing"
     }
 }

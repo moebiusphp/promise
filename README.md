@@ -1,24 +1,110 @@
 moebius/promise
 ===============
 
-A promise implementation which is widely compatible:
+A promise implementation which is widely compatible with various libraries.
+
+Modelled after the Promises/A+ specification in JavaScript.
+
+If you create a `Moebius\Promise` instance, it is directly usable as a drop-in
+replacement for:
 
  * `guzzlehttp/promises` by implementing `GuzzleHttp\Promise\PromiseInterface`
  * `react/promise` by implementing `React\Promise\PromiseInterface`
  * 'php-http/promise' by implementing `Http\Promise\Promise`
  * `amphp/amp` by implementing `Amp\Promise`
 
-Modelled after Promises/A+ in JavaScript.
+The `Moebius\Promise` objects have two primary uses: As a standard `Promise`
+object, and as a `Deferred` object using React terminology.
+
+
+Basic Promise Usage
+-------------------
+
+This is the most common way to use a promise:
+
+```
+use Moebius\Promise;
+
+function some_future_result() {
+    return new Promise(function($fulfill, $reject) {
+        /**
+         * Either fulfill the promise directly here, by calling
+         * the provided $fulfill(VALUE) and $reject(REASON) callbacks
+         * immediately, or make sure that one of these are called at
+         * a later time.
+         */
+    });
+}
+```
+
+
+"Deferred" usage
+----------------
+
+In React and some other libraries, an additional type of promise
+is called a "deferred" promise. Moebius combines these two uses:
+
+```
+use Moebius\Promise;
+
+function some_future_result() {
+    $result = new Promise();
+
+    /**
+     * Make sure that the promise is resolved now, by calling
+     * `$result->resolve(VALUE)` or `$result->reject(REASON)`
+     * here, or make sure that one of them will be called in
+     * the future.
+     */
+
+    return $result;
+}
+
+
+Supporting other promises yourself
+----------------------------------
+
+To support other promise implementations yourself, the convention
+has been to use reflection to inspect the `then()` method.
+
+Moebius Promise provides two ways to support other promises
+and ensure a consistent usage:
+
+### Casting
+
+```
+use Moebius\Promise;
+
+function accepting_a_promise(object $thenable) {
+    /**
+     * @throws InvalidArgumentException if the object is not a promise
+     */
+    $promise = Moebius\Promise::cast($thenable);
+}
+```
+
+
+Utility functions
+-----------------
+
+When using promises, you will often need to consume them in various
+ways. JavaScript provides a set of utility functions to resolve
+promises, and Moebius Promises provide those same functions:
+
+```
+use Moebius\Promise;
+
+
+
 
 Implementation details
 ----------------------
 
-In order to maintain compatability with Guzzle and PhpHttp promises, we
-had to fork their libraries. They share constant names which are incompatible.
-
-This means that we are doing something "bad" by an interface from another
-library. These interfaces have been unmodified for two years so we believe
-it is worth it - to achieve compatability/interoperability.
+In order to maintain compatability both Guzzle and PhpHttp promises, we
+have made some "trickery". It turns out that PhpHttp-promises are modelled
+after Guzzle promises, and are in fact compatible. Guzzle promises are
+a superset of PhpHttp promises, so if PhpHttp is installed - it will be
+`class_alias()`'ed to replace the `GuzzleHttp\Promise\PromiseInterface`.
 
 These constants now live in the `Moebius\Promise\SuperPromiseInterface` class,
 so that they are available in both child classes while not being ambiguous
