@@ -1,21 +1,23 @@
 <?php
 /**
- * Which libraries are in use?
+ * This bootstrap.php file checks if chass interfaces for various popular
+ * Promise implementations are installed via Composer. Since Moebius
+ * Promise implements these interfaces, we must ensure that the interface
+ * exists. This should be harmless, since if an application does not depend
+ * on for example React\Promise\PromiseInterface, then declaring an empty
+ * interface as a placeholder will cause no other side effects.
+ *
+ * Http\Promise\Promise and GuzzleHttp\Promise\PromiseInterface are
+ * impossible to implement in a single class implementation because the
+ * interfaces declare the same constants. Since Http\Promise\Promise is
+ * a subset of GuzzleHttp\Promise\PromiseInterface - we are making
+ * GuzzleHttp\Promise\PromiseInterface an alias of Http\Promise\Promise.
  */
 use Composer\InstalledVersions;
 use Moebius\Promise\EmptyInterface;
 
 /**
  * Moebius Promises require the GuzzleHttp\Promise\PromiseInterface.
- *
- * It is impossible to implement both GuzzleHttp\Promise\PromiseInterface and
- * Http\Promise\Promise in a single class. Fortunately Guzzle promises is a
- * can extend php-http promises.
- *
- * If php-http/promise is installed, we'll use that as a parent-interface
- * for our promises. If not, and the original is available, use that.
- * Finally, if neither is available - we'll use an empty placeholder
- * interface.
  */
 if (InstalledVersions::isInstalled('php-http/promise')) {
     class_alias(
@@ -38,7 +40,7 @@ if (InstalledVersions::isInstalled('php-http/promise')) {
 if (!InstalledVersions::isInstalled('react/promise')) {
     class_alias(
         \Moebius\Promise\ReactPromiseInterface::class,
-        \React\Promise\PromiseInterface::class
+        \React\Promise\ExtendedPromiseInterface::class
     );
 }
 

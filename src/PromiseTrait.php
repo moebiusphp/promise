@@ -7,26 +7,33 @@ use Moebius\Promise;
 trait PromiseTrait {
     private mixed $result = null;
     private string $status = Promise::PENDING;
-    private ?array $fulfillers = [];
-    private ?array $rejectors = [];
+    private ?array $onFulfilledListeners = [];
+    private ?array $onRejectionListeners = [];
     private ?array $childPromises = [];
-    private bool $fromThenable = false;
-//    private ?array $creator = null;
-    private bool $isErrorOwner = true;
-    private Throwable $created;
-    private ?Closure $cancelFunction;
 
     /**
-     * When implementing this trait, if your class has a costructor you must call `$this->Promise()`
-     * yourself.
-     *
-     * @param callable $resolver    Function that when invoked resolves the promise.
-     * @param callable $cancel      Function that will be invoked when a promise is cancelled via `Promise::cancel()`.
+     * True if it should not be possible to use {@see self::fulfill()} or {@see self::reject()}
+     * to fulfill the promise. This is used when wrapping another promise.
      */
-    public function __construct(callable $resolver=null, callable $cancel=null) {
-        $this->Promise($resolver, $cancel);
-    }
+    private bool $unresolvable = false;
 
+    /**
+     * A promise owns the error if the promise is not an indirect promise returned via
+     * {@see self::then()}.
+     */
+    private bool $isErrorOwner = true;
+
+    /**
+     * A throwable which holds the stack trace at the location where the promise was constructed.
+     * This is helpful when debugging promises.
+     */
+    private Throwable $created;
+
+    /**
+     * Destructor helps with the difficult to debug case where a promise is
+     * garbage collected without any notification because a developer forgot
+     * to listen to the on rejected state.
+     */
     public function __destruct() {
         if ($this->status === Promise::REJECTED && $this->isErrorOwner) {
             if ($this->result instanceof \Throwable) {
@@ -38,14 +45,14 @@ trait PromiseTrait {
     }
 
     /**
-     * Constructor in the trait
+     * Actual constructor - provided for classes that use this trait with a custom
+     * constructor.
      */
-    protected function Promise(callable $resolver=null, callable $cancel=null) {
-        // the generator stores the backtrace
+    protected function Promise(callable $resolver=null) {
+        // Record the stack trace for when this promise was created
         $this->created = new ExceptionConstructor($resolver);
 
-        $this->cancelFunction = $cancel;
-
+        // immediately invoke the resolver function
         if ($resolver !== null) {
             try {
                 $resolver($this->fulfill(...), $this->reject(...));
@@ -56,10 +63,24 @@ trait PromiseTrait {
     }
 
     /**
-     * Return 'pending', 'fulfilled', 'rejected'
+     * Is the promise fulfilled?
      */
-    public function status(): string {
-        return $this->status;
+    public function isFulfilled(): bool {
+        return $this->status === Promise::FULFILLED;
+    }
+
+    /**
+     * Is the promise rejected?
+     */
+    public function isRejected(): bool {
+        return $this->status === Promise::REJECTED;
+    }
+
+    /**
+     * Is the promise still waiting to be resolved?
+     */
+    public function isPending(): bool {
+        return $this->status === Promise::PENDING;
     }
 
     /**
@@ -67,7 +88,7 @@ trait PromiseTrait {
      */
     public function value(): mixed {
         if ($this->status !== Promise::FULFILLED) {
-            throw new PromiseException("Promise is not fulfilled", 0, $this->created);
+            throw new \LogicException("Promise is not fulfilled", 0, $this->created);
         }
         return $this->result;
     }
@@ -82,12 +103,19 @@ trait PromiseTrait {
         return $this->result;
     }
 
-    public function then(callable $onFulfilled=null, callable $onRejected=null, callable $_onProgress=null): PromiseInterface {
+    /**
+     * Add listeners to onFulfilled and/or onRejected events.
+     *
+     * @see React\Promise\PromiseInterface::then()
+     * @see GuzzleHttp\Promise\PromiseInterface::then()
+     * @see Http\Promise\Promise::then()
+     */
+    public function then(callable $onFulfilled=null, callable $onRejected=null): PromiseInterface {
         $nextPromise = new Promise();
         $nextPromise->created = $this->created;
         $nextPromise->isErrorOwner = &$this->isErrorOwner;
         if ($onFulfilled !== null && $this->status !== Promise::REJECTED) {
-            $this->fulfillers[] = function($result) use ($onFulfilled, $nextPromise) {
+            $this->onFulfilledListeners[] = function($result) use ($onFulfilled, $nextPromise) {
                 try {
                     $nextResult = $onFulfilled($result);
                     $nextPromise->fulfill($nextResult);
@@ -97,7 +125,7 @@ trait PromiseTrait {
             };
         }
         if ($onRejected !== null && $this->status !== Promise::FULFILLED) {
-            $this->rejectors[] = function($reason) use ($onRejected, $nextPromise) {
+            $this->onRejectionListeners[] = function($reason) use ($onRejected, $nextPromise) {
                 try {
                     $nextRejection = $onRejected($reason);
                     $nextPromise->reject($nextRejection);
@@ -111,63 +139,20 @@ trait PromiseTrait {
     }
 
     /**
-     * From Amp\Promise
-     * ----------------
+     * Fulfill the promise.
      *
-     * Registers a callback to be invoked when the promise is resolved.
-     *
-     * If this method is called multiple times, additional handlers will be registered instead of replacing any already
-     * existing handlers.
-     *
-     * If the promise is already resolved, the callback MUST be executed immediately.
-     *
-     * Exceptions MUST NOT be thrown from this method. Any exceptions thrown from invoked callbacks MUST be
-     * forwarded to the event-loop error handler.
-     *
-     * Note: You shouldn't implement this interface yourself. Instead, provide a method that returns a promise for the
-     * operation you're implementing. Objects other than pure placeholders implementing it are a very bad idea.
-     *
-     * @param callable $onResolved The first argument shall be `null` on success, while the second shall be `null` on
-     *     failure.
-     *
-     * @psalm-param callable(Throwable|null, mixed): (Promise|\React\Promise\PromiseInterface|\Generator<mixed,
-     *     Promise|\React\Promise\PromiseInterface|array<array-key, Promise|\React\Promise\PromiseInterface>, mixed,
-     *     mixed>|null) | callable(Throwable|null, mixed): void $onResolved
-     *
-     * @return void
-     */
-    public function onResolve(callable $handler) {
-        $this->then(function($value) use ($handler) {
-            $handler(null, $value);
-        }, function($value) use ($handler) {
-            $handler($value, null);
-        });
-    }
-
-    public function otherwise(callable $onRejected): PromiseInterface {
-        return $this->then(null, $onRejected);
-    }
-
-    /**
-     * Get the current status of the promise (for compatability with other
-     * promise implementations).
-     */
-    public function getState(): string {
-        return $this->status;
-    }
-
-    /**
-     * Fulfill the promise with a value
+     * @see GuzzleHttp\Promise\PromiseInterface::fulfill()
+     * @see Http\Promise\Promise::fulfill()
      */
     public function fulfill(mixed $result=null): void {
-        if ($this->fromThenable) {
+        if (!$this->isPending()) {
+            throw new \LogicException("Can't fulfill a promise twice");
+        }
+        if ($this->unresolvable) {
             throw new PromiseException("Promise was cast from Thenable and can't be externally fulfilled", 0, $this->created);
         }
         if (Promise::isThenable($result)) {
             $result->then($this->fulfill(...), $this->reject(...));
-            return;
-        }
-        if ($this->status !== Promise::PENDING) {
             return;
         }
         $this->status = Promise::FULFILLED;
@@ -176,58 +161,21 @@ trait PromiseTrait {
     }
 
     /**
-     * Alias of {@see self::fulfill} implemented for compatability with
-     * `GuzzleHttp\Promise\PromiseInterface`.
-     */
-    public function resolve($value) {
-        $this->fulfill($value);
-    }
-
-    /**
-     * Implemented for compatability with `GuzzleHttp\Promise\PromiseInterface`.
-     */
-    public function cancel() {
-        if ($this->state === Promise::PENDING && is_callable($this->cancelFunction)) {
-            try {
-                ($this->cancelFunction)();
-            } catch (\Throwable $e) {
-                if ($this->state === Promise::PENDING) {
-                    $this->reject($e);
-                } else {
-                    throw $e;
-                }
-            }
-            $this->cancelFunction = null;
-        }
-        if ($this->state === Promise::PENDING) {
-            // if the state is still pending we must ensure it is cancelled
-            $this->reject(new CancelledException());
-        }
-    }
-
-    public function wait($unwrap = true) {
-        if ($unwrap) {
-            if (class_exists(\Moebius\Coroutine::class)) {
-                return \Moebius\Coroutine::await($unwrap);
-            }
-            throw new \Exception("Can't unwrap a promise without an event loop currently. Not implemented. You can try to install moebius/coroutine to solve this.");
-        } else {
-            return $this->then(null, null);
-        }
-    }
-
-    /**
-     * Reject the promise with a reason
+     * Reject the promise with a reason. The $reason should generally be an exception
+     * but any value is valid.
+     *
+     * @see GuzzleHttp\Promise\PromiseInterface::reject()
+     * @see Http\Promise\Promise::reject()
      */
     public function reject(mixed $reason=null): void {
-        if ($this->fromThenable) {
+        if (!$this->isPending()) {
+            throw new \LogicException("Can't fulfill a promise twice");
+        }
+        if ($this->unresolvable) {
             throw new PromiseException("Promise was cast from Thenable and can't be externally rejected", 0, $this->created);
         }
         if (Promise::isThenable($reason)) {
             $reason->then($this->reject(...), $this->reject(...));
-            return;
-        }
-        if ($this->status !== Promise::PENDING) {
             return;
         }
         $this->status = Promise::REJECTED;
@@ -235,29 +183,32 @@ trait PromiseTrait {
         $this->settle();
     }
 
+    /**
+     * Function handles notifying of all listeners when the promise is resolved.
+     */
     private function settle(): void {
         if ($this->status === Promise::FULFILLED) {
-            $fulfillers = $this->fulfillers;
+            $onFulfilledListeners = $this->onFulfilledListeners;
 
             // avoid possible memory leaks:
-            $this->fulfillers = [];
-            $this->rejectors = null;
+            $this->onFulfilledListeners = [];
+            $this->onRejectionListeners = null;
 
-            foreach ($fulfillers as $fulfiller) {
+            foreach ($onFulfilledListeners as $fulfiller) {
                 $fulfiller($this->result);
             }
         } elseif ($this->status === Promise::REJECTED) {
-            $rejectors = $this->rejectors;
+            $onRejectionListeners = $this->onRejectionListeners;
 
             // avoid possible memory leaks:
-            $this->fulfillers = null;
-            $this->rejectors = [];
+            $this->onFulfilledListeners = null;
+            $this->onRejectionListeners = [];
 
-            if (!empty($rejectors)) {
+            if (!empty($onRejectionListeners)) {
                 // We don't need to show this error anymore
                 $this->isErrorOwner = false;
             }
-            foreach ($rejectors as $rejector) {
+            foreach ($onRejectionListeners as $rejector) {
                 $rejector($this->result);
             }
         }

@@ -1,18 +1,46 @@
 <?php
 namespace Moebius\Promise;
 
-use React\Promise\PromiseInterface as ReactPromiseInterface;
-use Amp\Promise as AmpPromiseInterface;
-use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
-use Http\Promise\Promise as PhpHttpPromiseInterface;
+/**
+ * A compatible promise implementation for PHP, compatible with the most
+ * popular promise implementations in PHP.
+ */
+interface PromiseInterface {
 
-interface PromiseInterface extends ReactPromiseInterface, AmpPromiseInterface, GuzzlePromiseInterface {
+    /**
+     * Is the promise fulfilled?
+     */
+    public function isFulfilled(): bool;
 
-    public function status(): string;
+    /**
+     * Is the promise rejected?
+     */
+    public function isRejected(): bool;
+
+    /**
+     * Is the promise unresolved?
+     */
+    public function isPending(): bool;
+
+    /**
+     * Get the value of a resolved promise.
+     *
+     * @return mixed
+     * @throws \LogicException if the promise is not in the "fulfilled" state
+     */
     public function value(): mixed;
-    public function reason(): mixed;
-    public function then(callable $onFulfilled=null, callable $onRejected=null, callable $onProgress=null);
-    public function fulfill(mixed $value=null): void;
-    public function reject(mixed $reason=null): void;
 
+    /**
+     * Get the reason of a rejected promise.
+     *
+     * @return mixed
+     * @throws \LogicException if the promise is not in the "rejected" state
+     */
+    public function reason(): mixed;
+
+    /**
+     * Add fulfill and/or reject listeners to the promise. Third argument
+     * is for compatability with React Promises and are ignored.
+     */
+    public function then(callable $onFulfilled=null, callable $onRejected=null, callable $void=null);
 }

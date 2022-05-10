@@ -3,7 +3,8 @@
     "description": "A promise implementation for PHP.",
     "type": "library",
     "require-dev": {
-        "charm/testing": ">=0"
+        "charm/testing": ">=0",
+        "react/promise": "^2.9"
     },
     "suggest": {
         "moebius/coroutine": "Enable awaiting promises within an event loop"
