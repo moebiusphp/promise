@@ -21,13 +21,13 @@ trait PromiseTrait {
      * A promise owns the error if the promise is not an indirect promise returned via
      * {@see self::then()}.
      */
-    private bool $isErrorOwner = true;
+    protected bool $isErrorOwner = true;
 
     /**
      * A throwable which holds the stack trace at the location where the promise was constructed.
      * This is helpful when debugging promises.
      */
-    private Throwable $created;
+    protected Throwable $creationTrace;
 
     /**
      * Destructor helps with the difficult to debug case where a promise is
@@ -39,7 +39,7 @@ trait PromiseTrait {
             if ($this->result instanceof \Throwable) {
                 throw $this->result;
             } else {
-                throw new ErrorException("Unhandled promise rejection", $this->result, $this->created);
+                throw new ErrorException("Unhandled promise rejection", $this->result, $this->creationTrace);
             }
         }
     }
@@ -49,8 +49,8 @@ trait PromiseTrait {
      * constructor.
      */
     protected function Promise(callable $resolver=null) {
-        // Record the stack trace for when this promise was created
-        $this->created = new ExceptionConstructor($resolver);
+        // Record the stack trace for when this promise was creationTrace
+        $this->creationTrace = new ExceptionConstructor($resolver);
 
         // immediately invoke the resolver function
         if ($resolver !== null) {
@@ -88,7 +88,7 @@ trait PromiseTrait {
      */
     public function value(): mixed {
         if ($this->status !== Promise::FULFILLED) {
-            throw new \LogicException("Promise is not fulfilled", 0, $this->created);
+            throw new \LogicException("Promise is not fulfilled", 0, $this->creationTrace);
         }
         return $this->result;
     }
@@ -98,7 +98,7 @@ trait PromiseTrait {
      */
     public function reason(): mixed {
         if ($this->status !== Promise::REJECTED) {
-            throw new PromiseException("Promise is not rejected", 0, $this->created);
+            throw new PromiseException("Promise is not rejected", 0, $this->creationTrace);
         }
         return $this->result;
     }
@@ -110,10 +110,8 @@ trait PromiseTrait {
      * @see GuzzleHttp\Promise\PromiseInterface::then()
      * @see Http\Promise\Promise::then()
      */
-    public function then(callable $onFulfilled=null, callable $onRejected=null): PromiseInterface {
-        $nextPromise = new Promise();
-        $nextPromise->created = $this->created;
-        $nextPromise->isErrorOwner = &$this->isErrorOwner;
+    public function then(callable $onFulfilled=null, callable $onRejected=null, callable $void=null): PromiseInterface {
+        $nextPromise = new DerivedPromise($this->creationTrace, $this->isErrorOwner);
         if ($onFulfilled !== null && $this->status !== Promise::REJECTED) {
             $this->onFulfilledListeners[] = function($result) use ($onFulfilled, $nextPromise) {
                 try {
@@ -149,7 +147,7 @@ trait PromiseTrait {
             throw new \LogicException("Can't fulfill a promise twice");
         }
         if ($this->unresolvable) {
-            throw new PromiseException("Promise was cast from Thenable and can't be externally fulfilled", 0, $this->created);
+            throw new PromiseException("Promise was cast from Thenable and can't be externally fulfilled", 0, $this->creationTrace);
         }
         if (Promise::isThenable($result)) {
             $result->then($this->fulfill(...), $this->reject(...));
@@ -172,7 +170,7 @@ trait PromiseTrait {
             throw new \LogicException("Can't fulfill a promise twice");
         }
         if ($this->unresolvable) {
-            throw new PromiseException("Promise was cast from Thenable and can't be externally rejected", 0, $this->created);
+            throw new PromiseException("Promise was cast from Thenable and can't be externally rejected", 0, $this->creationTrace);
         }
         if (Promise::isThenable($reason)) {
             $reason->then($this->reject(...), $this->reject(...));
