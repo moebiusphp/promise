@@ -35,7 +35,7 @@ trait PromiseTrait {
      * to listen to the on rejected state.
      */
     public function __destruct() {
-        if ($this->status === Promise::REJECTED && $this->isErrorOwner) {
+        if ($this->isRejected() && $this->isErrorOwner) {
             if ($this->result instanceof \Throwable) {
                 throw $this->result;
             } else {
@@ -87,7 +87,7 @@ trait PromiseTrait {
      * Return value if promise is fulfilled
      */
     public function value(): mixed {
-        if ($this->status !== Promise::FULFILLED) {
+        if (!$this->isFulfilled()) {
             throw new \LogicException("Promise is not fulfilled", 0, $this->creationTrace);
         }
         return $this->result;
@@ -97,7 +97,7 @@ trait PromiseTrait {
      * Return reason if promise is rejected
      */
     public function reason(): mixed {
-        if ($this->status !== Promise::REJECTED) {
+        if (!$this->isRejected()) {
             throw new PromiseException("Promise is not rejected", 0, $this->creationTrace);
         }
         return $this->result;
@@ -173,6 +173,9 @@ trait PromiseTrait {
             throw new PromiseException("Promise was cast from Thenable and can't be externally rejected", 0, $this->creationTrace);
         }
         if (Promise::isThenable($reason)) {
+            // If this promise is being resolved by another promise,
+            // we'll wait for that promise to be resolved and
+            // use their result to reject this promise.
             $reason->then($this->reject(...), $this->reject(...));
             return;
         }
