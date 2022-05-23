@@ -1,0 +1,48 @@
+Fulfilling initial promise (value="A1")
+    First fulfilled with value="A1" then fulfilling with value="B1"
+        Second fulfilled with value="B1" then fulfilling with value="C1"
+            Finally successful
+RESULT: A1B1C1
+---
+Fulfilling initial promise (value="A2")
+    First fulfilled with value="A2" then fulfilling with value="B2"
+        Second fulfilled with value="B2" then rejecting with value="c2"
+            Finally rejected
+RESULT: A2B2c2
+---
+Fulfilling initial promise (value="A3")
+    First fulfilled with value="A3" then rejecting with value="b3"
+        Second rejected with value="b3" then fulfilling with value="C3"
+            Finally successful
+RESULT: A3b3C3
+---
+Fulfilling initial promise (value="A4")
+    First fulfilled with value="A4" then rejecting with value="b4"
+        Second rejected with value="b4" then rejecting with value="c4"
+            Finally rejected
+RESULT: A4b4c4
+---
+Rejecting initial promise (value="a5")
+    First rejected with value="a5" then fulfilling with value="B5"
+        Second fulfilled with value="B5" then fulfilling with value="C5"
+            Finally successful
+RESULT: a5B5C5
+---
+Rejecting initial promise (value="a6")
+    First rejected with value="a6" then fulfilling with value="B6"
+        Second fulfilled with value="B6" then rejecting with value="c6"
+            Finally rejected
+RESULT: a6B6c6
+---
+Rejecting initial promise (value="a7")
+    First rejected with value="a7" then rejecting with value="b7"
+        Second rejected with value="b7" then fulfilling with value="C7"
+            Finally successful
+RESULT: a7b7C7
+---
+Rejecting initial promise (value="a8")
+    First rejected with value="a8" then rejecting with value="b8"
+        Second rejected with value="b8" then rejecting with value="c8"
+            Finally rejected
+RESULT: a8b8c8
+---

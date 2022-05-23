@@ -1,263 +1,10 @@
 <?php
 namespace Moebius;
 
-use function method_exists;
+use Psr\Log\LoggerInterface;
+use Moebius\Promise\UncaughtPromiseException;
 
-use ReflectionMethod, ReflectionNamedType, ReflectionUnionType;
-use Moebius\Promise\{
-    PromiseInterface,
-    PromiseTrait
-};
-use React\Promise\ExtendedPromiseInterface as ReactExtendedPromiseInterface;
-use React\Promise\PromiseInterface as ReactPromiseInterface;
-use Amp\Promise as AmpPromiseInterface;
-use GuzzleHttp\Promise\PromiseInterface as GuzzlePromiseInterface;
-use Http\Promise\Promise as PhpHttpPromiseInterface;
-
-
-class Promise implements PromiseInterface, ReactExtendedPromiseInterface, AmpPromiseInterface, GuzzlePromiseInterface {
-    use PromiseTrait {
-        then as private _then;
-    }
-
-    const PENDING = 'pending';
-    const FULFILLED = 'fulfilled';
-    const REJECTED = 'rejected';
-
-    /**
-     * The cancel-function is invoked when a promise is cancelled. A cancelled promise behaves
-     * exactly as a rejected promise which throws the CancelledException.
-     */
-    private ?Closure $cancelFunction;
-
-    /**
-     * When implementing this trait, if your class has a costructor you must call `$this->Promise()`
-     * yourself.
-     *
-     * @param callable $resolver    Function that when invoked resolves the promise.
-     * @param callable $cancel      Function that will be invoked when a promise is cancelled via `Promise::cancel()`.
-     */
-    public function __construct(callable $resolver=null, callable $cancel=null) {
-        $this->cancelFunction = $cancel;
-        $this->Promise($resolver);
-    }
-
-    public function then(callable $onFulfilled=null, callable $onRejected=null, callable $void=null) {
-        return $this->_then($onFulfilled, $onRejected);
-    }
-
-    /**
-     * @see React\Promise\ExtendedPromiseInterface::done()
-     */
-    public function done(callable $onFulfilled = null, callable $onRejected = null, callable $onProgress = null) {
-        $this->then($onFulfilled, $onRejected);
-        return;
-    }
-
-    /**
-     * Registers a callback to be invoked when the promise is resolved (fulfilled or rejected).
-     *
-     * NOTE! The first argument of the handler function is used if the promise was rejected,
-     * and the second argument is used if the promise is fulfilled. This is according to Amp\Promise.
-     *
-     * @see Amp\Promise::onResolve()
-     */
-    public function onResolve(callable $handler) {
-        $this->then(function($value) use ($handler) {
-            $handler(null, $value);
-        }, function($value) use ($handler) {
-            $handler($value, null);
-        });
-    }
-
-    /**
-     * Registers a callback to be invoked when the promise is rejected.
-     *
-     * @see React\Promise\ExtendedPromiseInterface::otherwise()
-     */
-    public function otherwise(callable $onRejected): PromiseInterface {
-        return $this->then(null, $onRejected);
-    }
-
-    /**
-     * Get the current status of the promise (for compatability with other
-     * promise implementations).
-     *
-     * @see GuzzleHttp\Promise\PromiseInterface::getState()
-     * @see Http\Promise\Promise::getState()
-     */
-    public function getState(): string {
-        if ($this->isPending()) {
-            return self::PENDING;
-        } elseif ($this->isFulfilled()) {
-            return self::FULFILLED;
-        } else {
-            return self::REJECTED;
-        }
-    }
-
-    /**
-     * Alias of {@see self::fulfill} implemented for compatability with 
-     * `GuzzleHttp\Promise\PromiseInterface`.
-     *
-     * NOTE! "Resolved" can also mean that a promise is no longer pending
-     * resolution. Both rejected and fulfilled promises can be considered
-     * to be resolved. In GuzzleHttp\Promise\PromiseInterface the word
-     * 'resolved' means 'fulfilled' - not 'rejected'.
-     */
-    public function resolve($value) {
-        $this->fulfill($value);
-    }
-
-    /**
-     * Cancel this promise. The effect of cancelling a promise is that it
-     * is rejected with the return value `null`. If a cancel-function was
-     * provided when the promise was constructed, that cancel-function will
-     * be invoked.
-     *
-     * @see GuzzleHttp\Promise\PromiseInterface::cancel()
-     */
-    public function cancel() {
-        if ($this->isPending() && is_callable($this->cancelFunction)) {
-            try {
-                ($this->cancelFunction)();
-            } catch (\Throwable $e) {
-                if ($this->isPending()) {
-                    $this->reject($e);
-                } else {
-                    throw $e;
-                }
-            }
-            $this->cancelFunction = null;
-        }
-        if ($this->isPending()) {
-            // if the state is still pending we must ensure it is cancelled
-            $this->reject(null);
-        }
-    }
-
-    /**
-     * Run scheduled callbacks, event loops and coroutines until this promise is resolved.
-     *
-     * If $unwrap == true the function will return the fulfillment value from the promise,
-     * or throw the rejection value.
-     *
-     * If $unwrap == false the function will return a promise which will resolve when
-     * this promise is resolved.
-     *
-     * @param bool $unwrap
-     * @throws \Throwable
-     * @see GuzzleHttp\Promise\PromiseInterface::wait()
-     * @see Http\Promise\Promise::wait()
-     */
-    public function wait($unwrap = true) {
-        if ($unwrap) {
-            if (class_exists(\Moebius\Coroutine::class)) {
-                return \Moebius\Coroutine::await($this);
-            }
-            throw new \LogicException("Can't unwrap a promise without an event loop currently. Not implemented. You can try to install moebius/coroutine to solve this.");
-        } else {
-            return $this->then(null, null);
-        }
-    }
-
-    /**
-     * @see React\Promise\ExtendedPromiseInterface::progress()
-     */
-    public function progress(callable $onProgress) {
-        // Functionality is deprecated in react and ignored here
-    }
-
-    /**
-     * @see React\Promise\ExtendedPromiseInterface::always()
-     */
-    public function always(callable $onFulfilledOrRejected) {
-        $resolver = static function($value) use ($onFulfilledOrRejected) {
-            $onFulfilledOrRejected($value);
-            return $value;
-        };
-        return $this->then($resolver, $resolver);
-    }
-
-    /**
-     * Cast a Thenable class into a Promise
-     */
-    public static function cast(object $thenable): self {
-        if ($thenable instanceof Promise) {
-            return $thenable;
-        }
-
-        static::assertThenable($thenable);
-
-        $promise = new self(function($resolve, $reject) use ($thenable) {
-            $thenable->then($resolve, $reject);
-        });
-
-        return $promise;
-    }
-
-    /**
-     * Check if an object is promise-like, or "thenable". This is for compatability
-     * with other promise implementations.
-     *
-     * @param object $thenable The object to check
-     * @return bool Returns true if the object appears to be promise like.
-     */
-    public static function isThenable(mixed $thenable): bool {
-        if (!is_object($thenable)) {
-            return false;
-        }
-        if (
-            $thenable instanceof PromiseInterface ||
-            $thenable instanceof GuzzlePromiseInterface ||
-            $thenable instanceof ReactPromiseInterface ||
-            $thenable instanceof PhpHttpPromiseInterface
-        ) {
-            return true;
-        }
-
-        if (!method_exists($thenable, 'then')) {
-            return false;
-        }
-
-        $rf = new ReflectionMethod($thenable, 'then');
-        if ($rf->isStatic()) {
-            return false;
-        }
-        if ($rf->getNumberOfParameters() < 2) {
-            return false;
-        }
-        $rp = $rf->getParameters();
-        foreach ([0, 1] as $p) {
-            if (!$rp[$p]->hasType()) {
-                continue;
-            }
-            $rt = $rp[$p]->getType();
-
-            if (
-                $rt instanceof ReflectionNamedType &&
-                (
-                    $rt->getName() === 'callable' ||
-                    $rt->getName() === 'mixed' ||
-                    $rt->getName() === \Closure::class
-                )
-            ) {
-                continue;
-            } elseif ($rt instanceof ReflectionUnionType) {
-                foreach ($rt->getTypes() as $rst) {
-                    if (
-                        $rt->getName() === 'callable' ||
-                        $rt->getName() === 'mixed' ||
-                        $rt->getName() === \Closure::class
-                    ) {
-                        continue 2;
-                    }
-                }
-            }
-            return false;
-        }
-        return true;
-    }
+class Promise implements PromiseInterface {
 
     /**
      * When all promises have been fulfilled, or if one promise rejects.
@@ -339,10 +86,272 @@ class Promise implements PromiseInterface, ReactExtendedPromiseInterface, AmpPro
         return $promise;
     }
 
-    private static function assertThenable(object $thenable): void {
-        if (!self::isThenable($thenable)) {
-            throw new \InvalidArgumentException("Object of class '".get_class($thenable)."' is not a valid promise-like object.");
+    /**
+     * Object pool to reuse Promise instances.
+     */
+    public static int $poolSize = 100;
+    private static array $pool = [];
+    private static int $poolIndex = 0;
+
+    /**
+     * A configurable logger which will get notified whenever promises
+     * are rejected without a rejection-handler. This is a common source
+     * of bugs because such exceptions would be silently discarded.
+     */
+    public static ?LoggerInterface $logger = null;
+
+
+
+    private const PENDING = 0;
+    private const FULFILLED = 1;
+    private const REJECTED = 2;
+
+    // True if the promise is being resolved by another promise
+    private bool $pendingPromise = false;
+
+    private int $status = self::PENDING;
+    private mixed $result = null;
+    private array $onFulfilled = [];
+    private array $onRejected = [];
+    private bool $errorDelivered = false;
+
+    /**
+     * We will only add secondary promises to our object pool for now.
+     */
+    private bool $secondary = false;
+
+    public function __construct(callable $resolveFunction=null) {
+        if ($resolveFunction !== null) {
+            // Exceptions thrown in the resolve-function are not caught
+            // because the error belongs to the place where the promise
+            // is created. If the exception needs to go to the receiver
+            // of the promise - call $reject(new \Exception()) for example.
+            $resolveFunction($this->fulfill(...), $this->reject(...));
         }
+    }
+
+    public function __destruct() {
+        $status = $this->status;
+        $errorDelivered = $this->errorDelivered;
+        $result = $this->result;
+
+        // Add this promise to our promise pool?
+        if ($this->secondary && self::$poolIndex < self::$poolSize) {
+            $this->status = self::PENDING;
+            $this->result = null;
+            $this->onFulfilled = [];
+            $this->onRejected = [];
+            self::$pool[self::$poolIndex++] = $this;
+        }
+
+        if ($status === self::REJECTED && !$errorDelivered) {
+            if (self::$logger === null) {
+                self::$logger = \Charm\FallbackLogger::get();
+/*
+                if ($result instanceof \Throwable) {
+                    throw new \LogicException("Uncaught (in promise)", 0, $result);
+                } else {
+                    throw new \LogicException("Uncaught (in promise) ".\get_debug_type($result));
+                }
+*/
+            }
+            $message = "Uncaught (in promise) ";
+            $context = [];
+            if ($result instanceof \Throwable) {
+                $message .= "{className}#{code}: {message} in {file}:{line}";
+                $context['className'] = \get_class($result);
+                $context['code'] = $result->getCode();
+                $context['message'] = $result->getMessage();
+                $context['file'] = $result->getFile();
+                $context['line'] = $result->getLine();
+                $context['exception'] = $result;
+            } else {
+                $message .= "{debugType}";
+                $context['debugType'] = \get_debug_type($result);
+                $context['value'] = $result;
+            }
+            self::$logger->error($message, $context);
+        }
+    }
+
+    public function isPending(): bool {
+        return $this->status === self::PENDING;
+    }
+
+    public function isFulfilled(): bool {
+        return $this->status === self::FULFILLED;
+    }
+
+    public function isRejected(): bool {
+        return $this->status === self::REJECTED;
+    }
+
+    public function then(callable $onFulfill=null, callable $onReject=null, callable $void=null): PromiseInterface {
+        // We need a secondary promise to return - getting from the instance pool
+        $promise = self::getInstance();
+
+        $onFulfillHandler = null;
+        $onRejectHandler = null;
+
+        if ($onFulfill && $this->status !== self::REJECTED) {
+            // no reason to create an onFulfillHandler if the promise is rejected
+            $onFulfillHandler = static function($value) use ($promise, $onFulfill, &$onFulfillHandler, &$onRejectHandler) {
+                try {
+                    $result = $onFulfill($value);
+                    $promise->fulfill($result);
+                } catch (\Throwable $e) {
+                    $promise->reject($e);
+                }
+            };
+        }
+
+        if ($onReject && $this->status !== self::FULFILLED) {
+            // no reason to create an onRejectHandler if the promise is fulfilled
+            $onRejectHandler = static function($reason) use ($promise, $onReject, &$onFulfillHandler, &$onRejectHandler) {
+                // Promise was rejected in a simple way
+                try {
+                    $result = $onReject($reason);
+                    $promise->fulfill($result);
+                } catch (\Throwable $e) {
+                    $promise->reject($e);
+                }
+            };
+        }
+
+        $this->onFulfilled[] = $onFulfillHandler ?? $promise->fulfill(...);
+        if ($onRejectHandler) {
+            $this->errorDelivered = true;
+            $this->onRejected[] = $onRejectHandler;
+        } else {
+            $this->onRejected[] = $promise->reject(...);
+        }
+
+        if ($this->status !== self::PENDING) {
+            $this->settle();
+        }
+
+        return $promise;
+    }
+
+    public function fulfill(mixed $value): void {
+        if ($this->status !== self::PENDING) {
+            return;
+        }
+
+        if (is_object($value) && self::isPromise($value)) {
+            $value->then($this->fulfill(...), $this->reject(...));
+            return;
+        }
+
+        $this->onRejected = [];
+        $this->status = self::FULFILLED;
+        $this->result = $value;
+        $this->settle();
+    }
+
+    public function reject(mixed $value): void {
+        if ($this->status !== self::PENDING || $this->pendingPromise) {
+            return;
+        }
+
+        $this->onFulfilled = [];
+        $this->status = self::REJECTED;
+        $this->result = $value;
+        $this->settle();
+    }
+
+    private function settle(): void {
+        if ($this->status === self::FULFILLED) {
+            $callbacks = $this->onFulfilled;
+            $this->onFulfilled = [];
+        } elseif ($this->status === self::REJECTED) {
+            $callbacks = $this->onRejected;
+            $this->onRejected = [];
+        } else {
+            throw new \LogicException("Promise is not ready to settle");
+        }
+        foreach ($callbacks as $callback) {
+            $callback($this->result);
+        }
+    }
+
+    public static function isThenable(object $promise): bool {
+        return self::isPromise($promise);
+    }
+
+    public static function isPromise($promise): bool {
+        if (!\is_object($promise)) {
+            return false;
+        }
+
+        if (!\method_exists($promise, 'then')) {
+            return false;
+        }
+
+        if (
+            $promise instanceof PromiseInterface ||
+            (class_exists(\GuzzleHttp\Promise\PromiseInterface::class, false) && $promise instanceof \GuzzleHttp\Promise\PromiseInterface) ||
+            (class_exists(\React\Promise\PromiseInterface::class, false) && $promise instanceof \React\Promise\PromiseInterface) ||
+            (class_exists(\Http\Promise\Promise::class, false) && $promise instanceof \Http\Promise\Promise)
+        ) {
+            return true;
+        }
+
+        $rm = new \ReflectionMethod($promise, 'then');
+        if ($rm->isStatic()) {
+            return false;
+        }
+        foreach ($rm->getParameters() as $index => $rp) {
+            if ($rp->hasType()) {
+                $rt = $rp->getType();
+                if ($rt instanceof \ReflectionNamedType) {
+                    if (
+                        $rt->getName() !== 'mixed' &&
+                        $rt->getName() !== 'callable' &&
+                        $rt->getName() !== \Closure::class
+                    ) {
+                        return false;
+                    }
+                } else {
+                }
+            }
+            if ($rp->isVariadic()) {
+                return true;
+            }
+            if ($index === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function cast(object $promise): PromiseInterface {
+        if ($promise instanceof PromiseInterface) {
+            return $promise;
+        }
+        if (!self::isPromise($promise)) {
+            throw new \TypeError("Expected a promise-like object");
+        }
+        $result = new Promise();
+        $promise->then($result->fulfill(...), $result->reject(...));
+        return $result;
+    }
+
+    /**
+     * Get a secondary promise instance. These promises are very often not
+     * used for anything, so we're using an object pool to avoid needless
+     * garbage collection.
+     */
+    private static function getInstance(callable $resolveFunction=null) {
+        if (self::$poolIndex > 0) {
+            return self::$pool[--self::$poolIndex];
+        }
+        $promise = new self($resolveFunction);
+        $promise->secondary = true;
+        // secondary instances does not have special error handling
+        $promise->errorDelivered = true;
+        return $promise;
     }
 
 }

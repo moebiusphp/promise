@@ -14,8 +14,7 @@
         "psr-4": {
             "Moebius\\Promise\\": "src/"
         },
-        "classmap": ["Promise.php"],
-        "files": ["bootstrap.php"]
+        "classmap": ["Promise.php", "PromiseInterface.php"]
     },
     "authors": [
         {
@@ -27,5 +26,8 @@
     "prefer-stable": true,
     "scripts": {
         "test": "vendor/bin/charm-testing"
+    },
+    "require": {
+        "charm/fallback-logger": "^1.0"
     }
 }
