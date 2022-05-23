@@ -7,91 +7,9 @@ use Moebius\Promise\UncaughtPromiseException;
 class Promise implements PromiseInterface {
 
     /**
-     * When all promises have been fulfilled, or if one promise rejects.
-     *
-     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
-     */
-    public static function all(iterable $promises): Promise {
-        $promise = new self();
-        $results = [];
-        $offset = 0;
-        $counter = count($promises);
-        foreach ($promises as $theirPromise) {
-            $theirPromise = static::cast($theirPromise);
-            $theirPromise->then(function(mixed $result) use (&$results, $offset, &$counter, $promise) {
-                $results[$offset] = $result;
-                if (--$counter === 0) {
-                    $promise->resolve($results);
-                }
-            }, function(mixed $reason) use ($promise) {
-                $promise->reject($reason);
-            });
-            $offset++;
-        }
-        return $promise;
-    }
-
-    /**
-     * When all promises have settled, provides an array of settled promises.
-     *
-     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
-     */
-    public static function allSettled(iterable $promises): Promise {
-        $promise = new self();
-        $results = [];
-        $counter = count($promises);
-        foreach ($promises as $theirPromise) {
-            $results[] = $theirPromise = static::cast($theirPromise);
-            $theirPromise->then(function(mixed $result) use (&$counter, $promise, &$results) {
-                if (--$counter === 0) {
-                    $promise->resolve($results);
-                }
-            });
-        }
-        return $promise;
-    }
-
-    /**
-     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
-     */
-    public static function any(iterable $promises): Promise {
-        $promise = new self();
-        $errors = [];
-        $counter = count($promises);
-        foreach ($promises as $offset => $theirPromise) {
-            static::cast($theirPromise)->then(function($result) use ($promise) {
-                $promise->resolve($result);
-            }, function($reason) use ($promise, &$counter, $offset, &$errors) {
-                $errors[$offset] = $reason;
-                if (--$counter === 0) {
-                    $promise->reject($errors);
-                }
-            });
-        }
-        return $promise;
-    }
-
-    /**
-     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
-     */
-    public static function race(iterable $promises): Promise {
-        $promise = new self();
-        foreach ($promises as $theirPromise) {
-            static::cast($theirPromise)->then(function($result) use ($promise) {
-                $promise->resolve($result);
-            }, function($reason) use ($promise) {
-                $promise->reject($reason);
-            });
-        }
-        return $promise;
-    }
-
-    /**
-     * Object pool to reuse Promise instances.
+     * Object pool size.
      */
     public static int $poolSize = 100;
-    private static array $pool = [];
-    private static int $poolIndex = 0;
 
     /**
      * A configurable logger which will get notified whenever promises
@@ -101,6 +19,8 @@ class Promise implements PromiseInterface {
     public static ?LoggerInterface $logger = null;
 
 
+    private static array $pool = [];
+    private static int $poolIndex = 0;
 
     private const PENDING = 0;
     private const FULFILLED = 1;
@@ -147,13 +67,6 @@ class Promise implements PromiseInterface {
         if ($status === self::REJECTED && !$errorDelivered) {
             if (self::$logger === null) {
                 self::$logger = \Charm\FallbackLogger::get();
-/*
-                if ($result instanceof \Throwable) {
-                    throw new \LogicException("Uncaught (in promise)", 0, $result);
-                } else {
-                    throw new \LogicException("Uncaught (in promise) ".\get_debug_type($result));
-                }
-*/
             }
             $message = "Uncaught (in promise) ";
             $context = [];
