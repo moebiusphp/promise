@@ -3,7 +3,7 @@
     "description": "A promise implementation for PHP.",
     "type": "library",
     "require-dev": {
-        "charm/testing": ">=0"
+        "charm/testing": ">=1"
     },
     "suggest": {
         "moebius/coroutine": "Enable awaiting promises within an event loop"
@@ -13,8 +13,7 @@
         "psr-4": {
             "Moebius\\Promise\\": "src/"
         },
-        "classmap": ["Promise.php"],
-        "files": ["bootstrap.php"]
+        "classmap": ["Promise.php", "PromiseInterface.php"]
     },
     "authors": [
         {
@@ -26,5 +25,9 @@
     "prefer-stable": true,
     "scripts": {
         "test": "vendor/bin/charm-testing"
+    },
+    "require": {
+        "psr/log": "^3.0",
+        "charm/fallback-logger": "^1.0"
     }
 }

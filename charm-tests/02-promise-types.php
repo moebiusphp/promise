@@ -8,7 +8,7 @@ function cast_test($o) {
         $p = Promise::cast($o);
         return true;
     } catch (\Throwable $e) {
-//        echo get_class($e).": ".$e->getMessage()." in ".$e->getFile().":".$e->getLine()."\n";
+        //echo get_class($e).": ".$e->getMessage()." in ".$e->getFile().":".$e->getLine()."\n";
         return false;
     }
 }
