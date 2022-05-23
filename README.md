@@ -1,7 +1,90 @@
 moebius/promise
 ===============
 
-A pure and well tested promise implementation designed for interoperability.
+A pure Promises/A+ promise implementation, designed to be flexible and well tested -
+and promoting interoperability.
+
+
+Promise interface
+-----------------
+
+Promise objects have the following clean interface. This interface and implementation
+follows the [ECMAScript Promise Specification](https://github.com/promises-aplus) as
+closely as possible. This means that you you can assume that the same semantics you
+know from javascript will work for these promises.
+
+
+
+```php
+namespace Moebius;
+
+interface PromiseInterface {
+
+    /**
+     * Schedule a callback to run when the promise is fulfilled
+     * or rejected.
+     *
+     * @param callable $onFulfill   Callback which will be invoked if the promise is fulfilled.
+     * @param callable $onReject    Callback which will be invoked if the promise is rejected.
+     * @param callable $void        Ignored; for compataiblity with other promise implementations.
+     * @return PromiseInterface     Returns a new promise which is resolved with the return value of $onFulfill/$onReject
+     */
+    public function then(callable $onFulfill=null, callable $onReject=null, callable $void=null): PromiseInterface;
+
+    /**
+     * Is the promise still pending resolution?
+     */
+    public function isPending(): bool;
+
+    /**
+     * Is the promise fulfilled?
+     */
+    public function isFulfilled(): bool;
+
+    /**
+     * Is the promise rejected?
+     */
+    public function isRejected(): bool;
+
+}
+```
+
+Interoperability
+----------------
+
+It is very common for promise-aware PHP libraries to explicitly type-check objects for
+compatability. This library provides a type-checking functions for this purpose:
+
+### Type casting
+
+If you need to ensure that the provided object follows the Promises/A+ semantics, with
+chainable `then()` - you should use the `Moebius\Promise::cast()` method:
+
+```php
+use Moebius\Promise;
+
+$promise = Promise::cast($somePromise);
+
+// Now you can safely check if the promise has been resolved
+
+```
+
+### Type checking
+
+```php
+use Moebius\Promise;
+
+if (Promise::isPromise($someObject)) {
+    // You can treat $someObject as a promise
+}
+```
+
+
+// Type casting
+$promise = Promise::cast($someObject);
+
+
+
 
 Casting a promise
 -----------------

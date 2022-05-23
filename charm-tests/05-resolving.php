@@ -1,7 +1,10 @@
 <?php
 require(__DIR__.'/../vendor/autoload.php');
 
-use Moebius\Promise;
+use Moebius\{
+    Promise,
+    Deferred
+};
 
 echo "Testing resolutions\n";
 
@@ -45,7 +48,7 @@ echo "\n";
 
 echo "Testing chained promises:\n";
 
-$p = new Promise();
+$p = new Deferred();
 $p->then(function($reason) {
     echo " 1. Resolved with reason ".json_encode($reason)."\n";
     return "First one done.";

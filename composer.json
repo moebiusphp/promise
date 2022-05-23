@@ -1,6 +1,6 @@
 {
     "name": "moebius/promise",
-    "description": "A promise implementation for PHP.",
+    "description": "A flexible and compatible promise implementation for PHP.",
     "type": "library",
     "require-dev": {
         "charm/testing": ">=1"
@@ -13,7 +13,7 @@
         "psr-4": {
             "Moebius\\Promise\\": "src/"
         },
-        "classmap": ["Promise.php", "PromiseInterface.php"]
+        "classmap": ["Promise.php", "Deferred.php", "PromiseInterface.php"]
     },
     "authors": [
         {

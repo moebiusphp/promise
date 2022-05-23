@@ -11,6 +11,7 @@ try {
     echo $e->getMessage();
 }
 
+// Here we're overwriting the $p object
 $p = new Promise(function($yes, $no) {
     $no(new \Exception("B"));
 });

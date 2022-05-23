@@ -2,6 +2,7 @@
 require(__DIR__.'/../vendor/autoload.php');
 
 use Moebius\Promise;
+use Moebius\Deferred;
 
 /**
  * Success then success
@@ -48,7 +49,7 @@ foreach ([
         [false, 'c8'],
     ]
 ] as $scenario) {
-    $p = new Promise();
+    $p = new Deferred();
     $trace = '';
     $p->then(
         function($value) use ($scenario, &$trace) {
