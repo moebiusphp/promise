@@ -1,6 +1,83 @@
 moebius/promise
 ===============
 
+A pure and well tested promise implementation designed for interoperability.
+
+Casting a promise
+-----------------
+
+Promises from other implementations can be cast to Moebius\Promise.
+
+```php
+<?php
+$promise = Moebius\Promise::cast($otherPromise);
+```
+
+Identifying a promise-like object
+---------------------------------
+
+Since there is no canonical PHP promise interface, it is useful to have a
+simple way to check if an object appears to be a valid promise.
+
+```php
+<?php
+if (Moebius\Promise::isPromise($otherPromise)) {
+    // promise has a valid `then()` method
+}
+```
+
+Creating a promise
+------------------
+
+Promises can generally be created in two ways; with a resolver function
+or without a resolver function - in which case the promise must be resolved
+by calling the `fulfill()` or the `reject()` method.
+
+*With a resolver function**
+
+```php
+<?php
+$promise = new Promise(function(callable $fulfill, callable $reject) {
+    $fulfill("Hello World");
+});
+$promise->then(function($value) {
+    echo $value."\n";
+});
+```
+
+*Without a resolver function*
+
+```php
+<?php
+$promise = new Promise();
+$promise->then(function($value) {
+    echo $value."\n";
+});
+$promise->resolve("Hello World");
+```
+
+
+Interoperability Notes
+----------------------
+
+The interface is focused on the resolution of promises; it does not care about
+how a promise is created - the interface is for functions that accept a promise.
+
+Most promise implementations have an extensive API, but a promise only needs
+to expose a `then()` function to be usable by 90% of libraries.
+
+It is also very helpful to have a way to determine if a promise is already
+resolved or rejected - which generally is implemented using a method which
+returns a string "pending", "resolved", "rejected" or "fulfilled".
+
+This library implements methods `isPending()`, `isResolved()` and `isFulfilled()`
+because these methods can be implemented regardless of how the underlying
+promise implementation records that state..
+
+Many promise implementations have methods like `otherwise()`, `finally()` and
+similar - which may be convenient, but it reduces interoperability because
+the same features can be implemented in several ways and with different names.
+
 A promise implementation which is widely compatible with various libraries.
 
 Modelled after the Promises/A+ specification in JavaScript.
@@ -22,7 +99,7 @@ Basic Promise Usage
 
 This is the most common way to use a promise:
 
-```
+```php
 use Moebius\Promise;
 
 function some_future_result() {
@@ -44,7 +121,7 @@ function some_future_result() {
 In React and some other libraries, an additional type of promise
 is called a "deferred" promise. Moebius combines these two uses:
 
-```
+```php
 use Moebius\Promise;
 
 function some_future_result() {
@@ -59,7 +136,7 @@ function some_future_result() {
 
     return $result;
 }
-
+```
 
 Supporting other promises yourself
 ----------------------------------
@@ -72,7 +149,7 @@ and ensure a consistent usage:
 
 ### Casting
 
-```
+```php
 use Moebius\Promise;
 
 function accepting_a_promise(object $thenable) {
@@ -82,20 +159,6 @@ function accepting_a_promise(object $thenable) {
     $promise = Moebius\Promise::cast($thenable);
 }
 ```
-
-
-Utility functions
------------------
-
-When using promises, you will often need to consume them in various
-ways. JavaScript provides a set of utility functions to resolve
-promises, and Moebius Promises provide those same functions:
-
-```
-use Moebius\Promise;
-
-
-
 
 Implementation details
 ----------------------
@@ -136,7 +199,7 @@ Basic usage
 Normally you will pass a resolve function into the promise when it is
 constructed. This variant is the most common way to use promises.
 
-```
+```php
 use Moebius\Promise;
 
 function some_function() {
@@ -156,7 +219,7 @@ In some cases, you are unable to resolve the promise from inside the promise.
 This way you can hold on to a reference of the promise and resolve (or reject) it after
 you return it.
 
-```
+```php
 use Moebius\Promise;
 
 $promise = new Promise();
@@ -198,28 +261,12 @@ Interoperability with other promise implementations:
   is converted into a Moebius\Promise instance.
 
 
-Checking the status of a promise:
-
-* `$promise->status()` gives 'pending', 'fulfilled', 'rejected' or 'cancelled'.
-  The 'cancelled' status shouldn't be used unless in very special cases.
-
-* `$promise->getState()` is an alias for `$promise->status()`.
-
-* `$promise->value()` gives the result of the promise, as long as the status is
-  'fulfilled'.
-
-* `$promise->reason()` gives the rejection value (normally an Exception object).
-
-
 Subscribing to the result of a promise:
 
 * `$promise->then(callable $onFulfilled=null, callable $onRejected=null): Promise`. The
   passed functions will be invoked immediately if the promise has already been
   settled (fulfilled or rejected). The returned promise is a new promise which
   will be resolved or rejected with the value from the callbacks.
-
-* `$promise->otherwise(callable $onRejected=null): Promise`. Works identically to
-  `$promise->then(null, $onRejected)`.
 
 
 Resolving a promise externally:

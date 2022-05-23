@@ -67,13 +67,6 @@ class Promise implements PromiseInterface {
         if ($status === self::REJECTED && !$errorDelivered) {
             if (self::$logger === null) {
                 self::$logger = \Charm\FallbackLogger::get();
-/*
-                if ($result instanceof \Throwable) {
-                    throw new \LogicException("Uncaught (in promise)", 0, $result);
-                } else {
-                    throw new \LogicException("Uncaught (in promise) ".\get_debug_type($result));
-                }
-*/
             }
             $message = "Uncaught (in promise) ";
             $context = [];
