@@ -1,2 +1,0 @@
-????-??-?? ??:??:?? [error]      Uncaught (in promise) Exception#0: This should get logged in /root/Moebius2/Loop/vendor/moebius/promise/charm-tests/04-uncaught.php:8
-????-??-?? ??:??:?? [error]      Uncaught (in promise) Exception#0: This should get logged too in /root/Moebius2/Loop/vendor/moebius/promise/charm-tests/04-uncaught.php:14
