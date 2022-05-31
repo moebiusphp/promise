@@ -1,5 +1,4 @@
 <?php
-
 use Moebius\Promise;
 
 $p = new Promise(function($yes, $no) {

@@ -1,5 +1,4 @@
 <?php
-
 use Moebius\Promise;
 
 $promise = new Promise(function($fulfill, $reject) {

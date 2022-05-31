@@ -1,5 +1,4 @@
 <?php
-
 use Moebius\Promise;
 
 function cast_test($o) {

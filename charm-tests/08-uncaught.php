@@ -1,5 +1,4 @@
 <?php
-
 use Moebius\Promise;
 
 echo "Promise 1\n";
