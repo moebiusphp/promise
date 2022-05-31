@@ -21,8 +21,6 @@
             "email": "frode@ennerd.com"
         }
     ],
-    "minimum-stability": "RC",
-    "prefer-stable": true,
     "scripts": {
         "test": "vendor/bin/charm-testing"
     },

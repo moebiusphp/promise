@@ -6,6 +6,9 @@ namespace Moebius\Promise;
  * to ensure deferred execution of callbacks in a system context,
  * as per the Promises/A+ specification.
  *
+ * PHP will immediately garbage collect this because it contains
+ * no cyclic references.
+ *
  * @internal
  */
 final class Runner {
@@ -14,19 +17,13 @@ final class Runner {
     private mixed $result;
 
     public function __construct(array $callbacks, mixed $result) {
-        if (class_exists(\Moebius\Loop::class)) {
-            foreach ($callbacks as $callback) {
-                \Moebius\Loop::queueMicrotask($callback, $result);
-            }
-            $this->callbacks = [];
-        } else {
-            $this->callbacks = $callbacks;
-            $this->result = $result;
-        }
+        $this->callbacks = $callbacks;
+        $this->result = $result;
     }
 
     public function __destruct() {
-        foreach ($this->callbacks as $callback) {
+        foreach ($this->callbacks as $k => $callback) {
+            unset($this->callbacks[$k]);
             try {
                 $callback($this->result);
             } catch (\Throwable $e) {
