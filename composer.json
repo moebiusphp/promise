@@ -3,7 +3,7 @@
     "description": "A flexible and compatible promise implementation for PHP.",
     "type": "library",
     "require-dev": {
-        "charm/testing": ">=1"
+        "charm/testing": ">=1.1"
     },
     "suggest": {
         "moebius/coroutine": "Enable awaiting promises within an event loop"
