@@ -5,7 +5,6 @@ use Moebius\Promise;
 use Moebius\PromiseInterface;
 use Moebius\Promise\{
     Logger,
-    Runner,
     UncaughtPromiseException,
     AlreadyResolvedException
 };
@@ -39,30 +38,8 @@ class ProtoPromise implements PromiseInterface {
     private array $onFulfilled = [];
     private array $onRejected = [];
     private bool $errorDelivered = false;
-    private array $queue = [];
 
     public function __destruct() {
-        while (!empty($this->queue)) {
-            $queue = $this->queue;
-            $this->queue = [];
-            foreach ($queue as $callback) {
-                try {
-                    $callback();
-                } catch (\Throwable $e) {
-
-                    $message = "Uncaught (in promise callback) {className} code={code}: {message} in {file}:{line}";
-                    $context = [
-                        'className' => \get_class($e),
-                        'code' => $e->getCode(),
-                        'message' => $e->getMessage(),
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine(),
-                        'exception' => $e
-                    ];
-                    Logger::get()->error($message, $context);
-                }
-            }
-        }
         $status = $this->status;
         $errorDelivered = $this->errorDelivered;
         $result = $this->result;
@@ -212,7 +189,7 @@ class ProtoPromise implements PromiseInterface {
         }
         $this->onFulfilled = [];
         $this->onRejected = [];
-        return new Runner($callbacks, $this->result);
+        $this->run($callbacks, $this->result);
     }
 
     /**
@@ -228,5 +205,25 @@ class ProtoPromise implements PromiseInterface {
         // secondary instances does not have special error handling
         $promise->errorDelivered = true;
         return $promise;
+    }
+
+    private function run(array $callbacks, mixed $arg=null): void {
+        foreach ($callbacks as $callback) {
+            try {
+                $callback($arg);
+            } catch (\Throwable $e) {
+
+                $message = "Uncaught (in promise callback) {className} code={code}: {message} in {file}:{line}";
+                $context = [
+                    'className' => \get_class($e),
+                    'code' => $e->getCode(),
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'exception' => $e
+                ];
+                Logger::get()->error($message, $context);
+            }
+        }
     }
 }
