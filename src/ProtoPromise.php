@@ -1,6 +1,9 @@
 <?php
 namespace Moebius\Promise;
 
+use const MOEBIUS_DEBUG;
+use Closure;
+use Charm\Util\ClosureTool;
 use Moebius\Promise;
 use Moebius\PromiseInterface;
 use Moebius\Promise\{
@@ -95,11 +98,12 @@ class ProtoPromise implements PromiseInterface {
 
         if ($onFulfill && $this->status !== self::REJECTED) {
             // no reason to create an onFulfillHandler if the promise is rejected
-            $onFulfillHandler = static function($value) use ($promise, $onFulfill, &$onFulfillHandler, &$onRejectHandler) {
+            $onFulfillHandler = function($value) use ($promise, $onFulfill, &$onFulfillHandler, &$onRejectHandler) {
                 try {
                     $result = $onFulfill($value);
                     $promise->fulfill($result);
                 } catch (\Throwable $e) {
+                    MOEBIUS_DEBUG and $this->logThrowable($e, "Thrown by fulfill listener", $onFulfill);
                     $promise->reject($e);
                 }
             };
@@ -107,12 +111,13 @@ class ProtoPromise implements PromiseInterface {
 
         if ($onReject && $this->status !== self::FULFILLED) {
             // no reason to create an onRejectHandler if the promise is fulfilled
-            $onRejectHandler = static function($reason) use ($promise, $onReject, &$onFulfillHandler, &$onRejectHandler) {
+            $onRejectHandler = function($reason) use ($promise, $onReject, &$onFulfillHandler, &$onRejectHandler) {
                 // Promise was rejected in a simple way
                 try {
                     $result = $onReject($reason);
                     $promise->fulfill($result);
                 } catch (\Throwable $e) {
+                    MOEBIUS_DEBUG and $this->logThrowable($e, "Thrown by reject listener", $onReject);
                     $promise->reject($e);
                 }
             };
@@ -149,6 +154,7 @@ class ProtoPromise implements PromiseInterface {
             try {
                 $value->then($this->fulfill(...), $this->reject(...));
             } catch (\Throwable $e) {
+                MOEBIUS_DEBUG and $this->logThrowable($e, "Thrown by then()-method of fulfill-promise");
                 $this->reject($e);
             }
             return null;
@@ -212,7 +218,6 @@ class ProtoPromise implements PromiseInterface {
             try {
                 $callback($arg);
             } catch (\Throwable $e) {
-
                 $message = "Uncaught (in promise callback) {className} code={code}: {message} in {file}:{line}";
                 $context = [
                     'className' => \get_class($e),
@@ -225,5 +230,25 @@ class ProtoPromise implements PromiseInterface {
                 Logger::get()->error($message, $context);
             }
         }
+    }
+
+    private function logThrowable(\Throwable $e, string $description=null, Closure $source=null) {
+        if ($source !== null) {
+            $ct = new ClosureTool($source);
+            $description = (string) $ct.": ".$description;
+        }
+        $message = "{className} code={code}: {message} in {file}:{line}\n{trace}";
+        if ($description !== null) {
+            $message = $description.": ".$message;
+        }
+        $context = [
+            'className' => \get_class($e),
+            'code' => $e->getCode(),
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'exception' => $e
+        ];
+        Logger::get()->error($message, $context);
     }
 }

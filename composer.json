@@ -27,7 +27,8 @@
     "require": {
         "psr/log": "^3.0",
         "charm/fallback-logger": "^1.0",
-        "moebius/common": "^1.0"
+        "moebius/common": "^1.0",
+        "charm/util-closuretool": "^1.0"
     },
     "minimum-stability": "dev",
     "prefer-stable": true
