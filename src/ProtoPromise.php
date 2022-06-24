@@ -247,7 +247,8 @@ class ProtoPromise implements PromiseInterface {
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
             'line' => $e->getLine(),
-            'exception' => $e
+            'exception' => $e,
+            'trace' => $e->getTraceAsString(),
         ];
         Logger::get()->error($message, $context);
     }

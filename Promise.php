@@ -3,6 +3,7 @@ namespace Moebius;
 
 use Closure;
 use Moebius\Promise\ProtoPromise;
+use Moebius\PromiseInterface;
 
 class Promise extends ProtoPromise {
 
@@ -81,8 +82,8 @@ class Promise extends ProtoPromise {
      *
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all
      */
-    public static final function all(iterable $promises): Promise {
-        $promise = new self();
+    public static final function all(iterable $promises): PromiseInterface {
+        $promise = ProtoPromise::getInstance();
         $results = [];
         $offset = 0;
         $counter = count($promises);
@@ -91,7 +92,7 @@ class Promise extends ProtoPromise {
             $theirPromise->then(function(mixed $result) use (&$results, $offset, &$counter, $promise) {
                 $results[$offset] = $result;
                 if (--$counter === 0) {
-                    $promise->resolve($results);
+                    $promise->fulfill($results);
                 }
             }, function(mixed $reason) use ($promise) {
                 $promise->reject($reason);
@@ -106,15 +107,15 @@ class Promise extends ProtoPromise {
      *
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
      */
-    public static final function allSettled(iterable $promises): Promise {
-        $promise = new self();
+    public static final function allSettled(iterable $promises): PromiseInterface {
+        $promise = ProtoPromise::getInstance();
         $results = [];
         $counter = count($promises);
         foreach ($promises as $theirPromise) {
             $results[] = $theirPromise = static::cast($theirPromise);
             $theirPromise->then(function(mixed $result) use (&$counter, $promise, &$results) {
                 if (--$counter === 0) {
-                    $promise->resolve($results);
+                    $promise->fulfill($results);
                 }
             });
         }
@@ -124,13 +125,13 @@ class Promise extends ProtoPromise {
     /**
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/any
      */
-    public static final function any(iterable $promises): Promise {
-        $promise = new self();
+    public static final function any(iterable $promises): PromiseInterface {
+        $promise = ProtoPromise::getInstance();
         $errors = [];
         $counter = count($promises);
         foreach ($promises as $offset => $theirPromise) {
             static::cast($theirPromise)->then(function($result) use ($promise) {
-                $promise->resolve($result);
+                $promise->fulfill($result);
             }, function($reason) use ($promise, &$counter, $offset, &$errors) {
                 $errors[$offset] = $reason;
                 if (--$counter === 0) {
@@ -144,11 +145,11 @@ class Promise extends ProtoPromise {
     /**
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race
      */
-    public static final function race(iterable $promises): Promise {
-        $promise = new self();
+    public static final function race(iterable $promises): PromiseInterface {
+        $promise = ProtoPromise::getInstance();
         foreach ($promises as $theirPromise) {
             static::cast($theirPromise)->then(function($result) use ($promise) {
-                $promise->resolve($result);
+                $promise->fulfill($result);
             }, function($reason) use ($promise) {
                 $promise->reject($reason);
             });
